@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+/*
+ * Humaid Trading Journal — design tokens
+ * Palette: emerald (primary), warm sand (surfaces), charcoal (text), white (cards)
+ */
+:root {
+  --background: #faf8f4; /* warm sand */
+  --foreground: #23282e; /* charcoal */
+  --card: #ffffff;
+  --card-foreground: #23282e;
+  --popover: #ffffff;
+  --popover-foreground: #23282e;
+  --primary: #047857; /* emerald-700 */
+  --primary-foreground: #f0fdf4;
+  --secondary: #f1ede4; /* deeper sand */
+  --secondary-foreground: #3d4450;
+  --muted: #f3f0e9;
+  --muted-foreground: #6b7280;
+  --accent: #ecfdf5; /* emerald-50 */
+  --accent-foreground: #065f46;
+  --destructive: #b91c1c;
+  --destructive-foreground: #fef2f2;
+  --border: #e7e1d5;
+  --input: #ddd6c8;
+  --ring: #059669;
+  --chart-1: #059669;
+  --chart-2: #b45309;
+  --chart-3: #334155;
+  --chart-4: #0d9488;
+  --chart-5: #a16207;
+  --sidebar: #1d2b26; /* deep charcoal-green */
+  --sidebar-foreground: #e8ede9;
+  --sidebar-muted: #8fa79c;
+  --sidebar-accent: #29423a;
+  --sidebar-border: #2c3f38;
+  --profit: #059669;
+  --loss: #dc2626;
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-profit: var(--profit);
+  --color-loss: var(--loss);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle 8-pointed star geometric pattern — used sparingly on hero and empty states */
+.pattern-islamic {
+  background-image: url("data:image/svg+xml,%3Csvg width='72' height='72' viewBox='0 0 72 72' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23047857' stroke-opacity='0.07' stroke-width='1'%3E%3Cpath d='M36 6 L44 28 L66 36 L44 44 L36 66 L28 44 L6 36 L28 28 Z'/%3E%3Cpath d='M36 16 L41 31 L56 36 L41 41 L36 56 L31 41 L16 36 L31 31 Z'/%3E%3Ccircle cx='36' cy='36' r='4'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.pattern-islamic-dark {
+  background-image: url("data:image/svg+xml,%3Csvg width='72' height='72' viewBox='0 0 72 72' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23a7f3d0' stroke-opacity='0.06' stroke-width='1'%3E%3Cpath d='M36 6 L44 28 L66 36 L44 44 L36 66 L28 44 L6 36 L28 28 Z'/%3E%3Cpath d='M36 16 L41 31 L56 36 L41 41 L36 56 L31 41 L16 36 L31 31 Z'/%3E%3Ccircle cx='36' cy='36' r='4'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Thin scrollbars for tables */
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
