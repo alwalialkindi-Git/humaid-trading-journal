@@ -1,180 +1,232 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Banknote, PieChart as PieIcon, TrendingUp, Wallet } from "lucide-react";
+import { Wallet } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
-import {
-  computePortfolioSummary,
-  computeTradeStats,
-} from "@/lib/calculations";
-import {
-  formatCurrency,
-  formatSignedCurrency,
-  pnlColor,
-  titleCase,
-} from "@/lib/format";
-import type { Dividend, Holding, Profile, Trade } from "@/lib/types";
-import { PageHeader } from "@/components/app/page-header";
-import { StatCard } from "@/components/app/stat-card";
-import { AllocationPie } from "@/components/charts/charts";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { CashBalanceCard } from "./cash-balance-card";
+import { createServices } from "@/lib/services/runtime";
+import type { CashBalanceView, TransactionRow } from "@/lib/services";
+import { formatCurrency, formatDate, formatNumber, titleCase } from "@/lib/format";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/app/empty-state";
+import { PortfolioHeader } from "@/components/portfolio/portfolio-header";
+import { PositionsTab } from "@/components/portfolio/positions-tab";
+import { HistoryTable, type AssetLabel } from "@/components/portfolio/history-table";
 
 export const metadata: Metadata = { title: "Portfolio" };
 
-export default async function PortfolioPage() {
+const TABS = [
+  { key: "positions", label: "Positions" },
+  { key: "cash", label: "Cash" },
+  { key: "history", label: "History" },
+] as const;
+
+const CASH_TYPES = [
+  "deposit",
+  "withdrawal",
+  "fee",
+  "zakat_payment",
+  "purification_payment",
+] as const;
+
+export default async function PortfolioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; type?: string }>;
+}) {
+  const { tab: tabParam, type: typeParam } = await searchParams;
+  const tab = TABS.some((t) => t.key === tabParam) ? tabParam! : "positions";
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [profileRes, holdingsRes, dividendsRes, tradesRes] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user!.id).single(),
-    supabase.from("holdings").select("*").eq("user_id", user!.id),
-    supabase.from("dividends").select("*").eq("user_id", user!.id),
-    supabase.from("trades").select("*").eq("user_id", user!.id),
-  ]);
+  let data;
+  try {
+    const services = await createServices(supabase);
+    const portfolios = await services.portfolios.list(user!.id);
+    const active = portfolios.find((p) => p.is_default) ?? portfolios[0];
+    if (!active) {
+      // Schema applied but this account predates the portfolio backfill.
+      throw new Error(
+        'relation missing: no portfolio — run the backfill block at the end of supabase/migrations/002_ledger.sql'
+      );
+    }
+    const [summary, transactions, brokers] = await Promise.all([
+      services.positions.getPortfolioSummary(user!.id, active.id),
+      services.transactions.list(user!.id, { portfolioId: active.id }),
+      services.brokers.list(user!.id),
+    ]);
+    data = { summary, transactions, brokers };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    if (/does not exist|schema cache|relation/i.test(message)) {
+      return <LedgerNotInitialized />;
+    }
+    throw e;
+  }
 
-  const profile = profileRes.data as Profile | null;
-  const holdings = (holdingsRes.data ?? []) as Holding[];
-  const dividends = (dividendsRes.data ?? []) as Dividend[];
-  const trades = (tradesRes.data ?? []) as Trade[];
+  const { summary, transactions, brokers } = data;
 
-  const currency = profile?.currency ?? "AED";
-  const cash = profile?.cash_balance ?? 0;
-  const summary = computePortfolioSummary(holdings, dividends);
-  const tradeStats = computeTradeStats(trades);
-  const totalValue = summary.marketValue + cash;
+  const assetLabels: Record<string, AssetLabel> = {};
+  for (const h of summary.holdings) {
+    assetLabels[h.asset.id] = {
+      symbol: h.asset.symbol,
+      name: h.asset.name,
+      currency: h.asset.currency,
+    };
+  }
 
-  // Include cash as its own slice in the asset-type allocation
-  const typeAllocation =
-    cash > 0
-      ? [...summary.allocationByType, { key: "Cash", value: cash }].sort(
-          (a, b) => b.value - a.value
-        )
-      : summary.allocationByType;
+  const latestPriceAsOf =
+    summary.holdings
+      .map((h) => h.price_as_of)
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? null;
+
+  const cashRows = transactions.filter((t) =>
+    (CASH_TYPES as readonly string[]).includes(t.type)
+  );
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Portfolio"
-        description="Holdings, cash, dividends, and allocation in one view."
-      >
-        <Button variant="outline" asChild>
-          <Link href="/holdings">
-            Manage holdings <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
-      </PageHeader>
+    <div>
+      <PortfolioHeader summary={summary} latestPriceAsOf={latestPriceAsOf} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Total portfolio value"
-          value={formatCurrency(totalValue, currency)}
-          sub={`${holdings.length} holdings + cash`}
-          icon={PieIcon}
-        />
-        <StatCard
-          label="Unrealized P&L"
-          value={formatSignedCurrency(summary.unrealizedPnl, currency)}
-          sub={`${summary.unrealizedPnlPercent.toFixed(1)}% vs cost basis`}
-          icon={TrendingUp}
-          valueClassName={pnlColor(summary.unrealizedPnl)}
-        />
-        <StatCard
-          label="Realized P&L"
-          value={formatSignedCurrency(tradeStats.realizedPnl, currency)}
-          sub={`from ${tradeStats.closedTrades} closed trades`}
-          icon={Wallet}
-          valueClassName={pnlColor(tradeStats.realizedPnl)}
-        />
-        <StatCard
-          label="Dividends received"
-          value={formatCurrency(summary.totalDividends, currency)}
-          sub={`${dividends.length} payments`}
-          icon={Banknote}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation by asset type</CardTitle>
-            <CardDescription>Including cash balance</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AllocationPie data={typeAllocation.map((a) => ({ ...a, key: a.key === "etf" ? "ETF" : titleCase(a.key) }))} currency={currency} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation by market</CardTitle>
-            <CardDescription>Where your capital sits</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AllocationPie data={summary.allocationByMarket} currency={currency} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocation by sector</CardTitle>
-            <CardDescription>Business exposure</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AllocationPie data={summary.allocationBySector} currency={currency} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <CashBalanceCard cashBalance={cash} currency={currency} />
-        <Card>
-          <CardHeader>
-            <CardTitle>Concentration check</CardTitle>
-            <CardDescription>Risk exposure at a glance</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {summary.largestPosition ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Largest position</span>
-                  <span className="font-medium">
-                    {summary.largestPosition.symbol} ·{" "}
-                    {(summary.largestPosition.share * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full ${summary.largestPosition.share > 0.35 ? "bg-amber-500" : "bg-emerald-600"}`}
-                    style={{
-                      width: `${Math.min(100, summary.largestPosition.share * 100)}%`,
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {summary.largestPosition.share > 0.35
-                    ? "Over 35% in a single symbol — consider diversifying."
-                    : "Concentration looks reasonable."}
-                </p>
-              </>
-            ) : (
-              <p className="text-muted-foreground">Add holdings to see exposure.</p>
+      {/* Tabs (URL-driven, server-rendered) */}
+      <div className="mb-5 flex gap-1 border-b" role="tablist" aria-label="Portfolio views">
+        {TABS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/portfolio?tab=${t.key}`}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={cn(
+              "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              tab === t.key
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
-            <div className="flex items-center justify-between border-t pt-3">
-              <span className="text-muted-foreground">Cash allocation</span>
-              <span className="font-medium">
-                {totalValue > 0 ? ((cash / totalValue) * 100).toFixed(1) : "0"}%
-              </span>
-            </div>
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
+      {tab === "positions" && (
+        <PositionsTab
+          holdings={summary.holdings}
+          transactions={transactions}
+          hasAnyTransactions={transactions.length > 0}
+        />
+      )}
+
+      {tab === "cash" && <CashTab cash={summary.cash} rows={cashRows} />}
+
+      {tab === "history" && (
+        <HistoryTable
+          transactions={transactions}
+          assetLabels={assetLabels}
+          brokers={brokers}
+          initialTypeFilter={typeParam}
+        />
+      )}
+    </div>
+  );
+}
+
+function CashTab({ cash, rows }: { cash: CashBalanceView[]; rows: TransactionRow[] }) {
+  if (cash.length === 0 && rows.length === 0) {
+    return (
+      <EmptyState
+        icon={Wallet}
+        title="No cash recorded"
+        description="Record a deposit to start tracking cash — buys and sells will move it automatically."
+      />
+    );
+  }
+
+  const sorted = [...rows].sort((a, b) =>
+    a.trade_date === b.trade_date
+      ? b.created_at.localeCompare(a.created_at)
+      : b.trade_date.localeCompare(a.trade_date)
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {cash.map((c) => (
+          <Card key={c.currency}>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Cash · {c.currency}
+              </p>
+              <p
+                className={cn(
+                  "mt-2 text-2xl font-semibold tracking-tight",
+                  c.balance < 0 && "text-loss"
+                )}
+              >
+                {formatCurrency(c.balance, c.currency)}
+              </p>
+              {c.balance < 0 && (
+                <p className="mt-1 text-xs text-amber-700">
+                  More spent than deposited — add an opening deposit.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {sorted.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="mb-3 text-sm font-semibold">Cash events</p>
+            <ul className="divide-y">
+              {sorted.map((t) => (
+                <li key={t.id} className="flex items-center justify-between py-2.5 text-sm">
+                  <span>
+                    <span className="font-medium">{titleCase(t.type)}</span>
+                    <span className="ml-2 text-muted-foreground">
+                      {formatDate(t.trade_date)}
+                    </span>
+                    {t.notes && (
+                      <span className="ml-2 text-xs text-muted-foreground">· {t.notes}</span>
+                    )}
+                  </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      t.type === "deposit" ? "text-profit" : "text-foreground"
+                    )}
+                  >
+                    {t.type === "deposit" ? "+" : "−"}
+                    {formatNumber(t.amount ?? 0)} {t.currency}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
-      </div>
+      )}
+    </div>
+  );
+}
+
+function LedgerNotInitialized() {
+  return (
+    <div className="mx-auto max-w-lg py-16 text-center">
+      <h1 className="text-xl font-semibold">The ledger isn’t initialized</h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        The database schema for portfolios and transactions hasn’t been applied to this
+        Supabase project yet. Run{" "}
+        <code className="rounded bg-muted px-1.5 py-0.5">
+          supabase/migrations/002_ledger.sql
+        </code>{" "}
+        in the SQL Editor, make sure{" "}
+        <code className="rounded bg-muted px-1.5 py-0.5">SUPABASE_SERVICE_ROLE_KEY</code> is
+        set, then reload. See docs/DEPLOYMENT.md.
+      </p>
     </div>
   );
 }

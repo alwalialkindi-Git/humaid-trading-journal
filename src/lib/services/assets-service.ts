@@ -131,6 +131,34 @@ export class AssetsService {
     });
   }
 
+  /**
+   * Cache a provider quote onto the asset (server-side, after ensure or a
+   * refresh-prices run). Guarded to provider-backed assets — manual_custom
+   * prices only move through setManualPrice.
+   */
+  async applyProviderQuote(
+    assetId: string,
+    price: number,
+    asOf: string
+  ): Promise<AssetRow> {
+    if (!Number.isFinite(price) || price < 0) {
+      throw new ServiceError("Quote price must be a non-negative number.", "validation");
+    }
+    const asset = await this.repo.getAsset(assetId);
+    if (!asset) throw new ServiceError("Asset not found.", "not_found");
+    if (asset.data_tier === "manual_custom" || !asset.provider) {
+      throw new ServiceError(
+        "This asset is manually priced — use setManualPrice.",
+        "validation"
+      );
+    }
+    return this.repo.updateAsset(assetId, {
+      latest_price: price,
+      price_as_of: asOf,
+      price_is_manual: false,
+    });
+  }
+
   /** Manual price update for manual_custom assets (and provider-gap fallback). */
   async setManualPrice(
     userId: string,

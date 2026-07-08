@@ -37,8 +37,8 @@ export default async function TradesPage() {
         description="Every position, every lesson — logged with honesty."
       >
         <Button asChild>
-          <Link href="/trades/new">
-            <Plus className="h-4 w-4" /> New trade
+          <Link href="/portfolio">
+            <Plus className="h-4 w-4" /> Add transaction
           </Link>
         </Button>
       </PageHeader>

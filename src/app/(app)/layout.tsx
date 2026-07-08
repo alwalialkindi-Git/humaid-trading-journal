@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/app/sidebar";
+import { ToastProvider } from "@/components/ui/toaster";
+import { AddTransactionFab } from "@/components/transactions/add-transaction-button";
 
 export default async function AppLayout({
   children,
@@ -22,16 +24,19 @@ export default async function AppLayout({
     .single();
 
   return (
-    <div className="min-h-screen bg-background">
-      <Sidebar
-        userName={profile?.full_name ?? null}
-        userEmail={user.email ?? ""}
-      />
-      <main className="lg:pl-60">
-        <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
-        </div>
-      </main>
-    </div>
+    <ToastProvider>
+      <div className="min-h-screen bg-background">
+        <Sidebar
+          userName={profile?.full_name ?? null}
+          userEmail={user.email ?? ""}
+        />
+        <main className="lg:pl-60">
+          <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            {children}
+          </div>
+        </main>
+        <AddTransactionFab />
+      </div>
+    </ToastProvider>
   );
 }

@@ -178,6 +178,32 @@ const STRATEGIES: Record<CostMethod, CostBasisStrategy<never>> = {
   fifo: fifoStrategy as CostBasisStrategy<never>,
 };
 
+/**
+ * Sell preview — the exact realized-P&L formula the average-cost strategy
+ * uses, exported for client-side previews so the preview CANNOT disagree
+ * with the persisted result (Phase 5 success criterion).
+ */
+export function previewSellRealizedPnl(params: {
+  heldQuantity: number;
+  averageCost: number;
+  sellQuantity: number;
+  sellPrice: number;
+  fees: number;
+}): { realizedPnl: number; valid: boolean } {
+  const { heldQuantity, averageCost, sellQuantity, sellPrice, fees } = params;
+  if (
+    !Number.isFinite(sellQuantity) ||
+    sellQuantity <= 0 ||
+    !Number.isFinite(sellPrice) ||
+    sellPrice < 0 ||
+    sellQuantity > heldQuantity + EPS
+  ) {
+    return { realizedPnl: 0, valid: false };
+  }
+  const realized = sellQuantity * (sellPrice - averageCost) - (fees || 0);
+  return { realizedPnl: Math.round((realized + Number.EPSILON) * 100) / 100, valid: true };
+}
+
 // ---------------------------------------------------------------------------
 // Replay ordering
 // ---------------------------------------------------------------------------

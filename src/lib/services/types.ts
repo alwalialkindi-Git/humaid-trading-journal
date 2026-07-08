@@ -156,6 +156,8 @@ export interface HoldingView {
     currency: string;
     asset_class: AssetClass;
     data_tier: DataTier;
+    provider: string | null;
+    provider_symbol: string | null;
   };
   quantity: number;
   average_cost: number;

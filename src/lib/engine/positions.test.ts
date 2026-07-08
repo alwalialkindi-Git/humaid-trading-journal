@@ -3,6 +3,7 @@ import {
   calculatePositions,
   compareTransactions,
   EngineError,
+  previewSellRealizedPnl,
   type EngineAsset,
   type EnginePortfolio,
   type EngineTransaction,
@@ -452,6 +453,49 @@ describe("adjustments", () => {
     expect(p.quantity).toBe(6);
     expect(p.realized_pnl).toBe(0);
     expect(p.average_cost).toBe(100);
+  });
+});
+
+describe("previewSellRealizedPnl (client preview = server truth)", () => {
+  it("matches the engine's sell computation for the worked example", () => {
+    // Position: 30 @ 120 avg. Sell 15 @ 140, fees 10 → engine says 290 (§3.2).
+    const preview = previewSellRealizedPnl({
+      heldQuantity: 30,
+      averageCost: 120,
+      sellQuantity: 15,
+      sellPrice: 140,
+      fees: 10,
+    });
+    expect(preview).toEqual({ realizedPnl: 290, valid: true });
+
+    const sellTx = sell(AAPL, 15, 140, { fees: 10, trade_date: "2026-01-10" });
+    const result = calculatePositions(
+      [buy(AAPL, 10, 100), buy(AAPL, 20, 130, { trade_date: "2026-01-02" }), sellTx],
+      assets,
+      portfolios
+    );
+    expect(result.realizedPnlByTransaction.get(sellTx.id)).toBe(preview.realizedPnl);
+  });
+
+  it("marks oversell and malformed inputs as invalid", () => {
+    expect(
+      previewSellRealizedPnl({
+        heldQuantity: 10,
+        averageCost: 100,
+        sellQuantity: 11,
+        sellPrice: 120,
+        fees: 0,
+      }).valid
+    ).toBe(false);
+    expect(
+      previewSellRealizedPnl({
+        heldQuantity: 10,
+        averageCost: 100,
+        sellQuantity: 0,
+        sellPrice: 120,
+        fees: 0,
+      }).valid
+    ).toBe(false);
   });
 });
 

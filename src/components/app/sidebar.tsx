@@ -15,8 +15,6 @@ import {
   PieChart,
   Settings,
   ShieldCheck,
-  Banknote,
-  Briefcase,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -25,10 +23,8 @@ import { LogoMark } from "@/components/logo";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/trades", label: "Trades Journal", icon: BookOpenText },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
-  { href: "/holdings", label: "Holdings", icon: Briefcase },
-  { href: "/dividends", label: "Dividends", icon: Banknote },
+  { href: "/trades", label: "Trades Journal", icon: BookOpenText },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/watchlist", label: "Watchlist", icon: Eye },

@@ -122,16 +122,11 @@ export default async function DashboardPage() {
         <EmptyState
           icon={BookOpenText}
           title="Nothing logged yet"
-          description="Record your first trade to unlock analytics, insights, and your trading calendar."
+          description="Record your first transaction to start building your portfolio."
         >
-          <div className="flex gap-2">
-            <Button asChild>
-              <Link href="/trades/new">Log a trade</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link href="/holdings">Add a holding</Link>
-            </Button>
-          </div>
+          <Button asChild>
+            <Link href="/portfolio">Open your portfolio</Link>
+          </Button>
         </EmptyState>
       </div>
     );
@@ -144,9 +139,18 @@ export default async function DashboardPage() {
         description="A calm overview of your trading, portfolio, and obligations."
       >
         <Button asChild>
-          <Link href="/trades/new">Log a trade</Link>
+          <Link href="/portfolio">Open portfolio</Link>
         </Button>
       </PageHeader>
+
+      {/* Phase 5 transition notice — removed with the Phase 8 data migration */}
+      <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+        This dashboard shows your <strong>legacy data</strong>. New transactions live in{" "}
+        <Link href="/portfolio" className="font-medium underline">
+          Portfolio
+        </Link>{" "}
+        — migration of old records is coming.
+      </p>
 
       {/* Top stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -55,6 +55,13 @@ export function formatDate(dateStr: string | null | undefined): string {
   });
 }
 
+/** True when a price timestamp is older than 24h (kept out of component
+ * render bodies — React purity rules forbid Date.now there). */
+export function isStalePrice(asOf: string | null | undefined): boolean {
+  if (!asOf) return false;
+  return Date.now() - new Date(asOf).getTime() > 24 * 3_600_000;
+}
+
 export function pnlColor(value: number): string {
   if (value > 0) return "text-profit";
   if (value < 0) return "text-loss";

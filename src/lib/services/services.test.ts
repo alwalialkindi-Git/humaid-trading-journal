@@ -481,4 +481,18 @@ describe("custom asset validation", () => {
     expect(updated.latest_price).toBe(13.4);
     expect(updated.price_is_manual).toBe(true);
   });
+
+  it("provider quotes apply only to provider-backed assets", async () => {
+    const updated = await services.assets.applyProviderQuote(
+      aapl.id,
+      315.5,
+      "2026-07-08T12:00:00Z"
+    );
+    expect(updated.latest_price).toBe(315.5);
+    expect(updated.price_is_manual).toBe(false);
+    // Manual/custom assets never take provider quotes.
+    await expect(
+      services.assets.applyProviderQuote(adib.id, 99, "2026-07-08T12:00:00Z")
+    ).rejects.toMatchObject({ code: "validation" });
+  });
 });

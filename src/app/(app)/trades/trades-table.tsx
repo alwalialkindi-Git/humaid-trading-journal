@@ -112,7 +112,7 @@ export function TradesTable({
         description="Log your first trade to start building an honest picture of your trading."
       >
         <Button asChild>
-          <Link href="/trades/new">Log your first trade</Link>
+          <Link href="/portfolio">Add a transaction</Link>
         </Button>
       </EmptyState>
     );
