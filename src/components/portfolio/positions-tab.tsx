@@ -9,6 +9,7 @@ import { setManualPriceAction } from "@/app/(app)/portfolio/actions";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ShieldBadge } from "@/components/ui/shield-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -31,15 +32,8 @@ import {
   pnlColor,
 } from "@/lib/format";
 
-const SHARIAH_BADGE: Record<
-  HoldingView["shariah_status"],
-  { label: string; variant: "success" | "warning" | "danger" | "neutral" }
-> = {
-  compliant: { label: "Compliant", variant: "success" },
-  doubtful: { label: "Doubtful", variant: "warning" },
-  non_compliant: { label: "Non-compliant", variant: "danger" },
-  not_reviewed: { label: "Not screened", variant: "neutral" },
-};
+// Compliance renders via the shield grammar (D1b): shape + label, never
+// color alone. ShieldBadge owns the closed state set.
 
 export function PositionsTab({
   holdings,
@@ -160,10 +154,10 @@ export function PositionsTab({
                     {h.allocation_percent != null ? `${h.allocation_percent}%` : "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={SHARIAH_BADGE[h.shariah_status].variant}>
-                      {SHARIAH_BADGE[h.shariah_status].label}
-                      {h.shariah_is_override ? " *" : ""}
-                    </Badge>
+                    <ShieldBadge
+                      state={h.shariah_status}
+                      overridden={h.shariah_is_override}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -198,9 +192,10 @@ export function PositionsTab({
                   </span>
                 )}
               </p>
-              <Badge variant={SHARIAH_BADGE[h.shariah_status].variant}>
-                {SHARIAH_BADGE[h.shariah_status].label}
-              </Badge>
+              <ShieldBadge
+                state={h.shariah_status}
+                overridden={h.shariah_is_override}
+              />
             </div>
             <div className="mt-2 flex items-end justify-between">
               <p className="text-xs text-muted-foreground">

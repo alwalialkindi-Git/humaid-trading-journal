@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toaster";
+import { GlossaryTerm } from "@/components/ui/glossary-term";
 import { AssetSearch, type SelectedAsset } from "./asset-search";
 import { BrokerSelect } from "./broker-select";
 
@@ -427,7 +428,8 @@ export function TransactionDialog({
                   </Select>
                   {type === "sell" && sellSource && (
                     <p className="text-xs text-muted-foreground">
-                      You hold {sellSource.quantity} @ {sellSource.average_cost} avg (
+                      You hold {sellSource.quantity} @ {sellSource.average_cost}{" "}
+                      <GlossaryTerm k="average_cost">avg</GlossaryTerm> (
                       {sellSource.asset.currency}).
                     </p>
                   )}
@@ -501,8 +503,8 @@ export function TransactionDialog({
                     onChange={(e) => setPurification(e.target.value)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    The impermissible share of this dividend, given to charity — separate
-                    from zakat.
+                    The impermissible share of this dividend, given to charity —{" "}
+                    <GlossaryTerm k="purification">what is purification?</GlossaryTerm>
                   </p>
                 </div>
               )}

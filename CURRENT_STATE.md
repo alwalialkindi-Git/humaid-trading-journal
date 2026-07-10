@@ -20,7 +20,9 @@ _Last updated: 2026-07-10 (start of D1a)_
 
 ## Current phase
 
-**D1a — COMPLETE (local commit, not pushed; awaiting owner review).** Delivered: Amanah token layer v2 (two-layer, dual themes verified in browser), figure typography utilities, `lib/amanah/` number + trust systems (20 rule tests), Figure primitive with provenance popover, FinTable primitives + cell renderers, Field wrapper, motion verbs wired into Dialog/Sheet, badge dark tints, single-mark EmptyState, theme toggle (sidebar footer). No page redesigns; Phase 5 flows untouched. Next: owner review → **D1b** (nav shell, ⌘K, mobile bottom tabs, shield icons, glossary registry).
+**D1a — LIVE in production** (`feae5bb`, verified: tokens/dual themes/boot script on prod; owner's authenticated pass ✔).
+
+**D1b — COMPLETE (local commit, not pushed; awaiting owner review).** Delivered: grouped nav shell (Council IA — OVERVIEW/WEALTH/THINKING/PURITY◆/UNDERSTAND; labels Wealth·Journal·Screener·Insights·Zakat & Purify, routes unchanged; shared `nav-config.ts` single source), ⌘K command palette (hand-rolled on Dialog, ARIA combobox, Actions + Navigate, opens the same TransactionDialog), mobile bottom tab bar (Home·Wealth·+·Zakat·More sheet; FAB retired; safe-area; toaster raised above bar), compliance ShieldBadge system (filled/half/slashed/dashed-outline shapes + labels — never color-alone; swapped into ComplianceBadge + Positions), glossary registry (`lib/glossary.ts`, 15 terms) + GlossaryTerm popover (wired: sell avg-cost, dividend purification). THINKING houses Journal+Calendar until Research lands (M5.5). Next: owner review of D1b → push → **D2 Wealth redesign**.
 
 ## Known limitations
 

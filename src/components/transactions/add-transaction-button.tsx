@@ -18,20 +18,6 @@ export function AddTransactionButton() {
   );
 }
 
-/** Global floating action button — available on every app page. */
-export function AddTransactionFab() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Add transaction"
-        title="Add transaction"
-        className="fixed bottom-6 right-6 z-40 flex h-13 w-13 items-center justify-center rounded-full bg-primary p-3.5 text-primary-foreground shadow-lg transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
-      <TransactionDialog open={open} onOpenChange={setOpen} />
-    </>
-  );
-}
+// The FAB was retired in D1b: desktop uses the ⌘K palette + explicit buttons,
+// mobile uses the bottom tab bar's center action (AMANAH §12.9 — replaced
+// patterns are removed, not accumulated).

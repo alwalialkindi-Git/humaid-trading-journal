@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/app/sidebar";
+import { BottomTabBar } from "@/components/app/bottom-tab-bar";
+import { CommandMenu } from "@/components/app/command-menu";
 import { ToastProvider } from "@/components/ui/toaster";
-import { AddTransactionFab } from "@/components/transactions/add-transaction-button";
 
 export default async function AppLayout({
   children,
@@ -30,12 +31,14 @@ export default async function AppLayout({
           userName={profile?.full_name ?? null}
           userEmail={user.email ?? ""}
         />
-        <main className="lg:pl-60">
+        {/* pb-24 keeps content clear of the mobile bottom tab bar */}
+        <main className="pb-24 lg:pb-0 lg:pl-60">
           <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {children}
           </div>
         </main>
-        <AddTransactionFab />
+        <BottomTabBar />
+        <CommandMenu />
       </div>
     </ToastProvider>
   );

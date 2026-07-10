@@ -1,32 +1,16 @@
-# NEXT_TASK — D1a: Design Foundation
+# NEXT_TASK — D1b: Navigation Shell & Command Layer
 
 > **STATUS: COMPLETE (committed locally, not pushed). Awaiting owner review.**
-> On approval, the next task is **D1b** — nav shell (grouped sidebar incl. THINKING/Research), ⌘K command menu (≤15 actions), mobile bottom tab bar (FAB removed), compliance shield icon set, glossary registry. Do not start D1b before owner approval of D1a.
+> On approval + push, the next task is **D2 — Wealth redesign**: FinTable composition (toolbar, sorting, aggregates, mobile card transform) and migration of the Positions/Cash/History tables onto it; StatBlock; AllocationBar (top-8 + other); ProvenancePopover enabled on Wealth+Home figures (actor included — CIO condition 3); Wealth header + Accounts tab; Cash statement layout; drawer restyle. Per sprint §28 D2 + Council A4/A6.
 
-**Objective (was):** implement the design foundation ONLY — the Amanah token layer and the primitives every later phase builds on. The app must look refreshed but behave identically.
+## Delivered scope (D1b)
 
-## Scope (build exactly this)
+- **Grouped navigation shell** — Council IA §5: OVERVIEW (Home) · WEALTH (Wealth) · THINKING (Journal, Calendar — Research absorbs these at M5.5) · PURITY ◆ (Zakat & Purify, Screener, Watchlist; visually distinct spine) · UNDERSTAND (Insights) · Settings. Labels renamed, routes unchanged. Single source: `components/app/nav-config.ts` (sidebar + palette + tabs consume it — no drift).
+- **Command palette** — ⌘K/Ctrl+K, hand-rolled on the Dialog primitive (no new dependency), ARIA combobox/listbox, groups: Actions (Add transaction → the same TransactionDialog; Toggle theme) + Navigate (from nav config). Summonable from sidebar search button and mobile top bar. Assets section deliberately deferred to D2/D3.
+- **Mobile bottom navigation** — Home · Wealth · center **+** (same TransactionDialog) · Zakat · More (sheet with remaining destinations + theme). FAB deleted (AMANAH §12.9); hamburger drawer retired; safe-area inset; content bottom padding; toasts raised above the bar.
+- **Compliance shield system** — `ui/shield-badge.tsx`: four shapes (filled+check / half / slashed / dashed outline) + mandatory labels + override dot with sr-text; compliance tokens as reinforcement only. `ComplianceBadge` reimplemented on it (dashboard/watchlist/screener upgraded in place); Positions tab swapped.
+- **Glossary registry** — `lib/glossary.ts` (15 entries, AMANAH register) + `ui/glossary-term.tsx` popover; proven in the transaction dialog (average cost, purification).
 
-1. **Design tokens v2** — two layers (primitives → semantic aliases) in `globals.css` per AMANAH §6/§12.1; all existing semantic names keep working (values change, names don't); new tokens added (`surface-*`, `ink-*`, `pnl-*`, `sacred`, `border-strong`, compliance set); brass/amber separated; radius 8/6/4; two shadows only (borders-first).
-2. **Dual themes** — light (warm paper) + dark (night desk) as co-equal alias sets under `[data-theme="dark"]`; no-FOUC init script; user preference persisted (`htj.theme`); default light; toggle placed unobtrusively (sidebar footer); Tailwind `dark:` custom variant wired to `data-theme`.
-3. **Typography / figure scale** — `figure-xl/lg/md/sm` utilities with `tabular-nums` per AMANAH §4.
-4. **Number formatting system** — `src/lib/amanah/number.ts`: money (2dp + trailing code), unit price (≤4dp trim→2), quantity (≤8dp trim), percent, signed deltas with **U+2212**, timestamps (HH:MM today / 8 Jul older / full in provenance), `≈` for converted figures. Unit-tested against AMANAH §4 rules. (Legacy `lib/format.ts` untouched — old pages migrate in D2+.)
-5. **Trust states** — `src/lib/amanah/trust.ts`: the closed 10-state set + visibility logic ("trust whispers, exceptions speak"); `FreshnessDot` + `TrustChip` components.
-6. **Figure primitive** — `components/ui/figure.tsx`: tabular figure + lighter currency code + delta sign/color + provenance popover (source · as-of · actor · derivation), quiet by default.
-7. **Table primitives** — `components/fin-table/`: presentational base (sticky header, density comfortable/compact, right-aligned numeric cells, footer-aggregate row) + cell renderers on Figure (Money/Qty/UnitPrice/Delta/Percent/Date/Text). **No existing table migrates yet** (that's D2).
-8. **Foundation components** — `Field` wrapper (label/help/error + aria); motion verbs (appear/slide/settle/nudge) as CSS utilities wired into Dialog/Sheet; Popover primitive; Badge dark-theme tints; EmptyState single-mark star (per Council A8 art direction).
+## Verified
 
-## Do NOT touch
-
-- No page redesigns (Wealth/Dashboard/etc. stay as-is on the new tokens).
-- No Phase 5 flow changes (buy/ADIB/sell-preview are the regression baseline).
-- No ledger/service/engine logic changes (except none).
-- No Supabase schema changes.
-- No new product-strategy documents.
-
-## Success criteria
-
-- Existing app works exactly as before (all flows), light and dark.
-- Phase 5 flows intact; 60+ existing tests still green; new formatter/trust tests green.
-- `typecheck` + `lint` + `build` + `test` all pass.
-- Commit locally; **do not push** until owner approves.
+typecheck / lint / build / 80 tests ✔. Local browser: login renders on fresh dev server, both themes exact (#F6F5F1 / #101413). Authenticated shell (sidebar groups, palette, bottom tabs) requires the owner's production pass post-push — no local credentials by design.
