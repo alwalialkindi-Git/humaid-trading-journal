@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServices } from "@/lib/services/runtime";
 import { ServiceError } from "@/lib/services";
+import { REVALIDATED_ROUTES } from "@/lib/services/revalidation";
 import type {
   AssetRow,
   BrokerRow,
@@ -27,6 +28,26 @@ import type { SymbolSearchResult } from "@/lib/market-data/types";
 export type ActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string; code: string };
+
+/** Display-currency preference (Bug 4) — USD or AED, stored on the profile. */
+export async function setDisplayCurrencyAction(
+  currency: "USD" | "AED"
+): Promise<ActionResult<null>> {
+  return run(async () => {
+    if (currency !== "USD" && currency !== "AED") {
+      throw new ServiceError("Display currency must be USD or AED.", "validation");
+    }
+    const { userId } = await requireUserId();
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("profiles")
+      .update({ currency })
+      .eq("id", userId);
+    if (error) throw new ServiceError(error.message, "conflict");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
+    return null;
+  });
+}
 
 async function requireUserId(): Promise<{ userId: string }> {
   const supabase = await createClient();
@@ -142,7 +163,7 @@ export async function setManualPriceAction(
     const { userId } = await requireUserId();
     const services = await createServices();
     const asset = await services.assets.setManualPrice(userId, assetId, price);
-    revalidatePath("/portfolio");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
     return asset;
   });
 }
@@ -158,7 +179,7 @@ export async function createTransactionAction(
     const { userId } = await requireUserId();
     const services = await createServices();
     const row = await services.transactions.create(userId, input);
-    revalidatePath("/portfolio");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
     return row;
   });
 }
@@ -171,7 +192,7 @@ export async function updateTransactionAction(
     const { userId } = await requireUserId();
     const services = await createServices();
     const row = await services.transactions.update(userId, id, input);
-    revalidatePath("/portfolio");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
     return row;
   });
 }
@@ -181,7 +202,7 @@ export async function deleteTransactionAction(id: string): Promise<ActionResult<
     const { userId } = await requireUserId();
     const services = await createServices();
     await services.transactions.delete(userId, id);
-    revalidatePath("/portfolio");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
     return null;
   });
 }
@@ -221,7 +242,7 @@ export async function deleteBrokerAction(id: string): Promise<ActionResult<null>
     const services = await createServices();
     await services.brokers.delete(userId, id);
     revalidatePath("/settings");
-    revalidatePath("/portfolio");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
     return null;
   });
 }
@@ -264,7 +285,7 @@ export async function refreshPricesAction(
         });
       }
     }
-    revalidatePath("/portfolio");
+    for (const route of REVALIDATED_ROUTES) revalidatePath(route);
     return result;
   });
 }

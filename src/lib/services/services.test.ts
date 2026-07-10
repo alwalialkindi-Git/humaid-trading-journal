@@ -461,6 +461,131 @@ describe("update transaction", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Shared financial read model — the exact summary equations (Bugs 2–3)
+// ---------------------------------------------------------------------------
+
+describe("getWealthSummary — the equations", () => {
+  it("computes market value, cash, total, basis, unrealized, realized per currency", async () => {
+    // AED world: deposit 50,000 → buy 1,000 ADIB @12.30 +20 fees → sell 400 @13 → dividend 850
+    await services.transactions.create(USER, {
+      portfolio_id: portfolio.id,
+      type: "deposit",
+      amount: 50000,
+      currency: "AED",
+      trade_date: "2026-05-01",
+    });
+    await services.transactions.create(USER, {
+      portfolio_id: portfolio.id,
+      asset_id: adib.id,
+      type: "buy",
+      quantity: 1000,
+      price: 12.3,
+      fees: 20,
+      currency: "AED",
+      trade_date: "2026-06-01",
+    });
+    await services.transactions.create(USER, {
+      portfolio_id: portfolio.id,
+      asset_id: adib.id,
+      type: "sell",
+      quantity: 400,
+      price: 13,
+      currency: "AED",
+      trade_date: "2026-06-20",
+    });
+    await services.transactions.create(USER, {
+      portfolio_id: portfolio.id,
+      asset_id: adib.id,
+      type: "dividend",
+      amount: 850,
+      currency: "AED",
+      trade_date: "2026-06-25",
+    });
+    // USD world: buy 10 AAPL @100, no deposit → negative USD cash
+    await services.transactions.create(USER, buyInput(aapl.id, 10, 100));
+
+    const wealth = await services.positions.getWealthSummary(USER, portfolio.id);
+    const aed = wealth.rows.find((r) => r.currency === "AED")!;
+    const usd = wealth.rows.find((r) => r.currency === "USD")!;
+
+    // AED — avg cost = (1000×12.30+20)/1000 = 12.32; 600 held @ price 13.15
+    expect(aed.market_value).toBe(600 * 13.15); // 7,890
+    expect(aed.cash).toBe(50000 - (1000 * 12.3 + 20) + 400 * 13 + 850);
+    expect(aed.total_value).toBe(round2(aed.market_value + aed.cash)); // THE equation
+    expect(aed.cost_basis).toBe(600 * 12.32); // 7,392
+    expect(aed.cost_basis_priced).toBe(aed.cost_basis); // ADIB is priced (manual 13.15)
+    expect(aed.unrealized_pnl).toBe(round2(aed.market_value - aed.cost_basis_priced)); // 498
+    expect(aed.realized_pnl).toBe(272); // 400 × (13 − 12.32)
+    expect(aed.dividends).toBe(850);
+
+    // USD — negative cash still reconciles: total = market + cash
+    expect(usd.market_value).toBe(10 * 310); // AAPL priced 310
+    expect(usd.cash).toBe(-1000);
+    expect(usd.total_value).toBe(usd.market_value + usd.cash); // 2,100
+    expect(usd.unrealized_pnl).toBe(10 * 310 - 10 * 100); // 2,100
+    expect(wealth.negative_cash_currencies).toEqual(["USD"]);
+
+    // Currencies are NEVER silently combined — one row per native currency.
+    expect(wealth.rows).toHaveLength(2);
+  });
+
+  it("unpriced holdings are excluded from market value and counted — never zeroed", async () => {
+    const ghost = await services.assets.createCustomAsset(USER, {
+      symbol: "GHOST",
+      name: "Unpriced Asset",
+      exchange: "ADX",
+      currency: "AED",
+      // no latest_price
+    });
+    await services.transactions.create(USER, {
+      portfolio_id: portfolio.id,
+      asset_id: ghost.id,
+      type: "buy",
+      quantity: 100,
+      price: 5,
+      currency: "AED",
+      trade_date: "2026-06-01",
+    });
+    const wealth = await services.positions.getWealthSummary(USER, portfolio.id);
+    const aed = wealth.rows.find((r) => r.currency === "AED")!;
+    expect(aed.market_value).toBe(0); // unpriced → excluded, not valued at 0-cost
+    expect(aed.cost_basis).toBe(500); // basis still real
+    expect(aed.cost_basis_priced).toBe(0);
+    expect(aed.unrealized_pnl).toBe(0); // measured over priced subset only
+    expect(aed.unpriced_holdings).toBe(1);
+    expect(wealth.unpriced_total).toBe(1);
+  });
+
+  it("Dashboard ≡ Wealth: the same read model returns identical figures (reconciliation)", async () => {
+    await services.transactions.create(USER, buyInput(aapl.id, 5, 200, { fees: 10 }));
+    // Both pages call this exact function — two calls, identical truth.
+    const forWealth = await services.positions.getWealthSummary(USER, portfolio.id);
+    const forDashboard = await services.positions.getWealthSummary(USER, portfolio.id);
+    expect(forDashboard.rows).toEqual(forWealth.rows);
+    expect(forDashboard.negative_cash_currencies).toEqual(
+      forWealth.negative_cash_currencies
+    );
+  });
+
+  it("native transaction values are never modified by summaries or FX", async () => {
+    const buy = await services.transactions.create(
+      USER,
+      buyInput(aapl.id, 10, 100, { fees: 5 })
+    );
+    await services.positions.getWealthSummary(USER, portfolio.id);
+    const after = (await services.transactions.list(USER)).find((t) => t.id === buy.id)!;
+    expect(after.price).toBe(100);
+    expect(after.quantity).toBe(10);
+    expect(after.fees).toBe(5);
+    expect(after.currency).toBe("USD");
+  });
+});
+
+function round2(v: number): number {
+  return Math.round((v + Number.EPSILON) * 100) / 100;
+}
+
 describe("custom asset validation", () => {
   it("rejects duplicate (symbol, exchange)", async () => {
     await expect(

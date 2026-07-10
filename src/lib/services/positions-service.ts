@@ -9,8 +9,10 @@ import type {
   AssetOverrideRow,
   AssetRow,
   CashBalanceView,
+  CurrencySummaryRow,
   HoldingView,
   PortfolioSummaryView,
+  WealthSummaryView,
 } from "./types";
 import { ServiceError } from "./errors";
 
@@ -162,6 +164,80 @@ export class PositionsService {
       currency: c.currency,
       balance: c.balance,
     }));
+  }
+
+  /**
+   * THE shared financial read model (Bug 2/3): both Wealth and Dashboard
+   * render this — never their own arithmetic. Per-NATIVE-currency rows;
+   * FX conversion happens strictly in the presentation layer (lib/fx).
+   */
+  async getWealthSummary(userId: string, portfolioId: string): Promise<WealthSummaryView> {
+    const portfolio = await this.repo.getPortfolio(userId, portfolioId);
+    if (!portfolio) throw new ServiceError("Portfolio not found.", "forbidden");
+
+    const holdings = await this.getHoldings(userId, portfolioId);
+    const cash = await this.getCashBalances(userId, portfolioId);
+
+    const rows = new Map<string, CurrencySummaryRow>();
+    const row = (currency: string): CurrencySummaryRow => {
+      let r = rows.get(currency);
+      if (!r) {
+        r = {
+          currency,
+          market_value: 0,
+          cash: 0,
+          total_value: 0,
+          cost_basis: 0,
+          cost_basis_priced: 0,
+          unrealized_pnl: 0,
+          realized_pnl: 0,
+          dividends: 0,
+          unpriced_holdings: 0,
+          as_of: null,
+        };
+        rows.set(currency, r);
+      }
+      return r;
+    };
+
+    for (const h of holdings) {
+      const r = row(h.asset.currency);
+      r.realized_pnl = round2(r.realized_pnl + h.realized_pnl);
+      r.dividends = round2(r.dividends + h.dividends_received);
+      if (h.quantity <= 0) continue; // closed positions carry only lifetime P&L
+      r.cost_basis = round2(r.cost_basis + h.cost_basis);
+      if (h.market_value != null) {
+        r.market_value = round2(r.market_value + h.market_value);
+        r.cost_basis_priced = round2(r.cost_basis_priced + h.cost_basis);
+        if (h.price_as_of && (!r.as_of || h.price_as_of > r.as_of)) {
+          r.as_of = h.price_as_of;
+        }
+      } else {
+        r.unpriced_holdings += 1;
+      }
+    }
+
+    for (const c of cash) {
+      row(c.currency).cash = c.balance;
+    }
+
+    for (const r of rows.values()) {
+      r.total_value = round2(r.market_value + r.cash);
+      r.unrealized_pnl = round2(r.market_value - r.cost_basis_priced);
+    }
+
+    const sorted = [...rows.values()].sort((a, b) =>
+      a.currency.localeCompare(b.currency)
+    );
+
+    return {
+      portfolio,
+      rows: sorted,
+      negative_cash_currencies: sorted
+        .filter((r) => r.cash < 0)
+        .map((r) => r.currency),
+      unpriced_total: sorted.reduce((s, r) => s + r.unpriced_holdings, 0),
+    };
   }
 
   async getPortfolioSummary(

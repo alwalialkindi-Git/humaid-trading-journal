@@ -184,6 +184,38 @@ export interface CashBalanceView {
   balance: number;
 }
 
+/**
+ * Per-currency financial truth (shared read model — Bug 2/3 fix).
+ * One row per NATIVE currency; nothing here is FX-converted (conversion is
+ * presentation-layer). The equations these fields must satisfy are tested:
+ *   total_value        = market_value + cash
+ *   unrealized_pnl     = market_value − cost_basis_priced
+ *   market_value       = Σ qty × effective_price over PRICED open holdings
+ */
+export interface CurrencySummaryRow {
+  currency: string;
+  market_value: number;
+  cash: number;
+  total_value: number;
+  /** Cost basis of ALL open holdings in this currency (priced or not). */
+  cost_basis: number;
+  /** Cost basis of the PRICED subset — the base of unrealized_pnl. */
+  cost_basis_priced: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  dividends: number;
+  unpriced_holdings: number;
+  /** Latest price timestamp among holdings in this currency. */
+  as_of: string | null;
+}
+
+export interface WealthSummaryView {
+  portfolio: PortfolioRow;
+  rows: CurrencySummaryRow[];
+  negative_cash_currencies: string[];
+  unpriced_total: number;
+}
+
 export interface PortfolioSummaryView {
   portfolio: PortfolioRow;
   holdings: HoldingView[];

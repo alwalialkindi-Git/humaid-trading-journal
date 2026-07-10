@@ -11,6 +11,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { PortfolioHeader } from "@/components/portfolio/portfolio-header";
 import { PositionsTab } from "@/components/portfolio/positions-tab";
 import { HistoryTable, type AssetLabel } from "@/components/portfolio/history-table";
+import { SummaryCards } from "@/components/portfolio/summary-cards";
+import { NegativeCashNotice } from "@/components/portfolio/negative-cash-notice";
 
 export const metadata: Metadata = { title: "Portfolio" };
 
@@ -52,12 +54,14 @@ export default async function PortfolioPage({
         'relation missing: no portfolio — run the backfill block at the end of supabase/migrations/002_ledger.sql'
       );
     }
-    const [summary, transactions, brokers] = await Promise.all([
+    const [summary, wealth, transactions, brokers, profileRes] = await Promise.all([
       services.positions.getPortfolioSummary(user!.id, active.id),
+      services.positions.getWealthSummary(user!.id, active.id),
       services.transactions.list(user!.id, { portfolioId: active.id }),
       services.brokers.list(user!.id),
+      supabase.from("profiles").select("currency, full_name").eq("id", user!.id).single(),
     ]);
-    data = { summary, transactions, brokers };
+    data = { summary, wealth, transactions, brokers, profile: profileRes.data };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (/does not exist|schema cache|relation/i.test(message)) {
@@ -66,7 +70,9 @@ export default async function PortfolioPage({
     throw e;
   }
 
-  const { summary, transactions, brokers } = data;
+  const { summary, wealth, transactions, brokers, profile } = data;
+  const displayCurrency = profile?.currency === "USD" ? "USD" : "AED";
+  const actorName = profile?.full_name ?? null;
 
   const assetLabels: Record<string, AssetLabel> = {};
   for (const h of summary.holdings) {
@@ -90,7 +96,22 @@ export default async function PortfolioPage({
 
   return (
     <div>
-      <PortfolioHeader summary={summary} latestPriceAsOf={latestPriceAsOf} />
+      <PortfolioHeader
+        portfolioId={wealth.portfolio.id}
+        portfolioName={wealth.portfolio.name}
+        displayCurrency={displayCurrency}
+        latestPriceAsOf={latestPriceAsOf}
+      />
+
+      {/* THE shared financial read model (Bugs 2–4) — same component as Dashboard */}
+      <div className="mb-5 space-y-3">
+        <SummaryCards
+          wealth={wealth}
+          displayCurrency={displayCurrency}
+          actorName={actorName}
+        />
+        <NegativeCashNotice currencies={wealth.negative_cash_currencies} />
+      </div>
 
       {/* Tabs (URL-driven, server-rendered) */}
       <div className="mb-5 flex gap-1 border-b" role="tablist" aria-label="Portfolio views">

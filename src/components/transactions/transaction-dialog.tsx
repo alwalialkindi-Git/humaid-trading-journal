@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toaster";
 import { GlossaryTerm } from "@/components/ui/glossary-term";
+import {
+  decideClose,
+  isDraftDirty,
+  serializeDraft,
+  submitOutcome,
+  type DraftSnapshot,
+} from "@/lib/transactions/draft";
 import { AssetSearch, type SelectedAsset } from "./asset-search";
 import { BrokerSelect } from "./broker-select";
 
@@ -107,6 +114,12 @@ export function TransactionDialog({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Draft protection (Bug 1): snapshot taken after the dialog initializes;
+  // any close request while dirty must confirm — never silently discard.
+  const snapshotRef = useRef<string | null>(null);
+  const armSnapshotRef = useRef(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
   // Load context + apply edit target when the dialog opens.
   useEffect(() => {
     if (!open) return;
@@ -161,6 +174,9 @@ export function TransactionDialog({
           }
         }
       }
+      // Initialization done — the NEXT committed render is the clean state
+      // the dirty check compares against.
+      armSnapshotRef.current = true;
     })();
     return () => {
       cancelled = true;
@@ -182,6 +198,9 @@ export function TransactionDialog({
     setNotes("");
     setFormError(null);
     setMoreOpen(false);
+    setConfirmDiscard(false);
+    snapshotRef.current = null;
+    armSnapshotRef.current = false;
   }, []);
 
   const portfolioHoldings = useMemo(
@@ -200,6 +219,68 @@ export function TransactionDialog({
         presetBuyAsset?.id ??
         (isEdit ? edit!.transaction.asset_id : null))
       : positionAssetId || null;
+
+  // ---- draft protection (Bug 1) -------------------------------------------
+
+  const currentSnapshot = useCallback(
+    (): DraftSnapshot => ({
+      type,
+      assetKey: activeAssetId,
+      portfolioId,
+      brokerId,
+      quantity,
+      price,
+      amount,
+      fees,
+      currency,
+      tradeDate,
+      tradeTime,
+      purification,
+      notes,
+    }),
+    [
+      type,
+      activeAssetId,
+      portfolioId,
+      brokerId,
+      quantity,
+      price,
+      amount,
+      fees,
+      currency,
+      tradeDate,
+      tradeTime,
+      purification,
+      notes,
+    ]
+  );
+
+  // Capture the clean snapshot on the first committed render after init.
+  useEffect(() => {
+    if (armSnapshotRef.current) {
+      armSnapshotRef.current = false;
+      snapshotRef.current = serializeDraft(currentSnapshot());
+    }
+  });
+
+  const hardClose = useCallback(() => {
+    reset();
+    onOpenChange(false);
+  }, [reset, onOpenChange]);
+
+  /** Every close path (Escape, backdrop, X, Cancel) funnels through here. */
+  const requestClose = useCallback(() => {
+    const decision = decideClose({
+      dirty: isDraftDirty(currentSnapshot(), snapshotRef.current),
+      saving,
+    });
+    if (decision === "ignore") return;
+    if (decision === "confirm") {
+      setConfirmDiscard(true);
+      return;
+    }
+    hardClose();
+  }, [currentSnapshot, saving, hardClose]);
 
   // Sell preview — the same code the server persists (engine export).
   const preview = useMemo(() => {
@@ -281,22 +362,20 @@ export function TransactionDialog({
       : await createTransactionAction(input);
     setSaving(false);
 
-    if (!res.ok) {
-      setFormError(res.error);
+    // Bug 1 contract (submitOutcome): failure keeps the dialog open with
+    // every field intact and the ACTUAL server error visible; success
+    // closes, clears the draft, and the revalidated routes (server-side)
+    // plus router.refresh() update every read model.
+    const outcome = submitOutcome(res);
+    if (outcome.keepOpen) {
+      setFormError(res.ok ? null : res.error);
       return;
     }
 
     localStorage.setItem("htj.lastPortfolio", portfolioId);
     if (brokerId) localStorage.setItem("htj.lastBroker", brokerId);
 
-    const label = TYPE_OPTIONS.find((t) => t.value === type)?.label ?? type;
-    toast(
-      isEdit
-        ? "Transaction updated — positions recomputed."
-        : type === "sell" && res.data.realized_pnl != null
-          ? `${label} recorded — realized P&L ${res.data.realized_pnl >= 0 ? "+" : ""}${res.data.realized_pnl} ${input.currency}.`
-          : `${label} recorded — portfolio updated.`
-    );
+    if (outcome.toast) toast(outcome.toast);
     reset();
     onOpenChange(false);
     router.refresh();
@@ -308,11 +387,40 @@ export function TransactionDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
+        // Radix funnels EVERY internal close request here (Escape, backdrop,
+        // the X button). A dirty draft is never silently discarded (Bug 1) —
+        // the dialog stays open until requestClose decides.
+        if (!next) requestClose();
       }}
     >
       <DialogContent className="max-w-xl">
+        {confirmDiscard && (
+          <div
+            role="alertdialog"
+            aria-label="Discard this unsaved transaction?"
+            className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-card/95 p-6"
+          >
+            <div className="w-full max-w-xs space-y-3 text-center">
+              <p className="text-sm font-semibold">Discard this unsaved transaction?</p>
+              <p className="text-xs text-ink-muted">
+                The details you entered will be lost.
+              </p>
+              <div className="flex justify-center gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setConfirmDiscard(false)}
+                  autoFocus
+                >
+                  Keep editing
+                </Button>
+                <Button size="sm" variant="destructive" onClick={hardClose}>
+                  Discard
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit transaction" : "Add transaction"}</DialogTitle>
           <DialogDescription>
@@ -623,7 +731,7 @@ export function TransactionDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={requestClose}
                 disabled={saving}
               >
                 Cancel
