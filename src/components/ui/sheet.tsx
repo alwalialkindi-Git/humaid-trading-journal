@@ -29,6 +29,8 @@ function SheetContent({
           "fixed z-50 flex flex-col bg-card shadow-xl outline-none",
           "inset-x-0 bottom-0 max-h-[88vh] rounded-t-2xl border-t",
           "sm:inset-y-0 sm:left-auto sm:right-0 sm:h-full sm:max-h-none sm:w-[480px] sm:rounded-none sm:border-l sm:border-t-0",
+          // AMANAH motion verb: slide (240ms)
+          "animate-slide-up sm:animate-slide-in-end",
           className
         )}
         {...props}

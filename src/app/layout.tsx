@@ -21,6 +21,13 @@ export const metadata: Metadata = {
     "Track trades, analyze performance, screen for Shariah compliance, and calculate zakat — a trading journal built for Muslim investors.",
 };
 
+/**
+ * Theme boot — runs before paint to avoid a flash of the wrong theme.
+ * Default is light (D1a decision: system-follow deferred until legacy pages
+ * lose their hardcoded light tints); user preference persists in htj.theme.
+ */
+const THEME_INIT = `try{var t=localStorage.getItem("htj.theme");document.documentElement.dataset.theme=t==="dark"?"dark":"light"}catch(e){document.documentElement.dataset.theme="light"}`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -33,7 +40,11 @@ export default function RootLayout({
       lang="en"
       dir="ltr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

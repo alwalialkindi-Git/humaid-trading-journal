@@ -20,6 +20,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { LogoMark } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -85,13 +86,16 @@ export function Sidebar({
           </p>
           <p className="truncate text-xs text-sidebar-muted">{userEmail}</p>
         </div>
-        <button
-          onClick={handleSignOut}
-          title="Sign out"
-          className="rounded-md p-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-white"
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-center">
+          <ThemeToggle className="rounded-md p-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground" />
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="rounded-md p-2 text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
