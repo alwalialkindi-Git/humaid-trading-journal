@@ -35,6 +35,8 @@ Do not redesign the product, create new product-planning documents, or revisit a
 
 ## Design rules
 
+- **D-018 — Design Before Code (permanent):** every MAJOR feature is visualized in Figma FIRST (requirements → council → CIO → Figma → design review → code → verify-against-Figma → deploy). No major UI work starts directly in the repo. Token/naming authority remains code-canonical per D-017; minor fixes may go code-first.
+
 - AMANAH is law: token-only colors (no raw hex in components), closed sets (4 motion verbs, 10 table column types, 10 trust states, chart usage table), tabular numerals on all figures, true minus U+2212, sign+color never color-alone, `≈` on every FX-converted figure.
 - Vocabulary: past-tense verbs of record (Recorded/Updated/Calculated/Reconciled…); no exclamation marks; the two sanctioned phrases only.
 - Islamic identity is behavioral: no crescents/domes/ornament; 8-point star only at its three permitted sites; brass only for sacred moments; compliance = shield grammar, never bare green.
