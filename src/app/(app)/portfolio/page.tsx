@@ -1,42 +1,39 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/server";
 import { createServices } from "@/lib/services/runtime";
-import type { CashBalanceView, TransactionRow } from "@/lib/services";
-import { formatCurrency, formatDate, formatNumber, titleCase } from "@/lib/format";
-import { Card, CardContent } from "@/components/ui/card";
-import { EmptyState } from "@/components/app/empty-state";
 import { PortfolioHeader } from "@/components/portfolio/portfolio-header";
 import { PositionsTab } from "@/components/portfolio/positions-tab";
+import { AccountsTab } from "@/components/portfolio/accounts-tab";
+import { CashStatement } from "@/components/portfolio/cash-statement";
 import { HistoryTable, type AssetLabel } from "@/components/portfolio/history-table";
 import { SummaryCards } from "@/components/portfolio/summary-cards";
 import { NegativeCashNotice } from "@/components/portfolio/negative-cash-notice";
 
-export const metadata: Metadata = { title: "Portfolio" };
+export const metadata: Metadata = { title: "Wealth" };
 
 const TABS = [
   { key: "positions", label: "Positions" },
+  { key: "accounts", label: "Accounts" },
   { key: "cash", label: "Cash" },
-  { key: "history", label: "History" },
+  { key: "activity", label: "Activity" },
 ] as const;
 
-const CASH_TYPES = [
-  "deposit",
-  "withdrawal",
-  "fee",
-  "zakat_payment",
-  "purification_payment",
-] as const;
+type TabKey = (typeof TABS)[number]["key"];
+
+function resolveTab(param: string | undefined): TabKey {
+  if (param === "history") return "activity"; // legacy links keep working
+  return TABS.some((t) => t.key === param) ? (param as TabKey) : "positions";
+}
 
 export default async function PortfolioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; type?: string }>;
+  searchParams: Promise<{ tab?: string; type?: string; broker?: string }>;
 }) {
-  const { tab: tabParam, type: typeParam } = await searchParams;
-  const tab = TABS.some((t) => t.key === tabParam) ? tabParam! : "positions";
+  const { tab: tabParam, type: typeParam, broker: brokerParam } = await searchParams;
+  const tab = resolveTab(tabParam);
 
   const supabase = await createClient();
   const {
@@ -54,14 +51,16 @@ export default async function PortfolioPage({
         'relation missing: no portfolio — run the backfill block at the end of supabase/migrations/002_ledger.sql'
       );
     }
-    const [summary, wealth, transactions, brokers, profileRes] = await Promise.all([
-      services.positions.getPortfolioSummary(user!.id, active.id),
-      services.positions.getWealthSummary(user!.id, active.id),
-      services.transactions.list(user!.id, { portfolioId: active.id }),
-      services.brokers.list(user!.id),
-      supabase.from("profiles").select("currency, full_name").eq("id", user!.id).single(),
-    ]);
-    data = { summary, wealth, transactions, brokers, profile: profileRes.data };
+    const [summary, wealth, statements, transactions, brokers, profileRes] =
+      await Promise.all([
+        services.positions.getPortfolioSummary(user!.id, active.id),
+        services.positions.getWealthSummary(user!.id, active.id),
+        services.positions.getCashStatement(user!.id, active.id),
+        services.transactions.list(user!.id, { portfolioId: active.id }),
+        services.brokers.list(user!.id),
+        supabase.from("profiles").select("currency, full_name").eq("id", user!.id).single(),
+      ]);
+    data = { summary, wealth, statements, transactions, brokers, profile: profileRes.data };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (/does not exist|schema cache|relation/i.test(message)) {
@@ -70,7 +69,7 @@ export default async function PortfolioPage({
     throw e;
   }
 
-  const { summary, wealth, transactions, brokers, profile } = data;
+  const { summary, wealth, statements, transactions, brokers, profile } = data;
   const displayCurrency = profile?.currency === "USD" ? "USD" : "AED";
   const actorName = profile?.full_name ?? null;
 
@@ -89,10 +88,6 @@ export default async function PortfolioPage({
       .filter(Boolean)
       .sort()
       .at(-1) ?? null;
-
-  const cashRows = transactions.filter((t) =>
-    (CASH_TYPES as readonly string[]).includes(t.type)
-  );
 
   return (
     <div>
@@ -114,7 +109,7 @@ export default async function PortfolioPage({
       </div>
 
       {/* Tabs (URL-driven, server-rendered) */}
-      <div className="mb-5 flex gap-1 border-b" role="tablist" aria-label="Portfolio views">
+      <div className="mb-5 flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Wealth views">
         {TABS.map((t) => (
           <Link
             key={t.key}
@@ -122,7 +117,7 @@ export default async function PortfolioPage({
             role="tab"
             aria-selected={tab === t.key}
             className={cn(
-              "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+              "whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors",
               tab === t.key
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
@@ -138,97 +133,30 @@ export default async function PortfolioPage({
           holdings={summary.holdings}
           transactions={transactions}
           hasAnyTransactions={transactions.length > 0}
+          displayCurrency={displayCurrency}
         />
       )}
 
-      {tab === "cash" && <CashTab cash={summary.cash} rows={cashRows} />}
+      {tab === "accounts" && (
+        <AccountsTab brokers={brokers} transactions={transactions} />
+      )}
 
-      {tab === "history" && (
+      {tab === "cash" && (
+        <CashStatement
+          statements={statements}
+          assetLabels={assetLabels}
+          brokers={brokers}
+        />
+      )}
+
+      {tab === "activity" && (
         <HistoryTable
           transactions={transactions}
           assetLabels={assetLabels}
           brokers={brokers}
           initialTypeFilter={typeParam}
+          initialBrokerFilter={brokerParam}
         />
-      )}
-    </div>
-  );
-}
-
-function CashTab({ cash, rows }: { cash: CashBalanceView[]; rows: TransactionRow[] }) {
-  if (cash.length === 0 && rows.length === 0) {
-    return (
-      <EmptyState
-        icon={Wallet}
-        title="No cash recorded"
-        description="Record a deposit to start tracking cash — buys and sells will move it automatically."
-      />
-    );
-  }
-
-  const sorted = [...rows].sort((a, b) =>
-    a.trade_date === b.trade_date
-      ? b.created_at.localeCompare(a.created_at)
-      : b.trade_date.localeCompare(a.trade_date)
-  );
-
-  return (
-    <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cash.map((c) => (
-          <Card key={c.currency}>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Cash · {c.currency}
-              </p>
-              <p
-                className={cn(
-                  "mt-2 text-2xl font-semibold tracking-tight",
-                  c.balance < 0 && "text-loss"
-                )}
-              >
-                {formatCurrency(c.balance, c.currency)}
-              </p>
-              {c.balance < 0 && (
-                <p className="mt-1 text-xs text-amber-700">
-                  More spent than deposited — add an opening deposit.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {sorted.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="mb-3 text-sm font-semibold">Cash events</p>
-            <ul className="divide-y">
-              {sorted.map((t) => (
-                <li key={t.id} className="flex items-center justify-between py-2.5 text-sm">
-                  <span>
-                    <span className="font-medium">{titleCase(t.type)}</span>
-                    <span className="ml-2 text-muted-foreground">
-                      {formatDate(t.trade_date)}
-                    </span>
-                    {t.notes && (
-                      <span className="ml-2 text-xs text-muted-foreground">· {t.notes}</span>
-                    )}
-                  </span>
-                  <span
-                    className={cn(
-                      "font-medium",
-                      t.type === "deposit" ? "text-profit" : "text-foreground"
-                    )}
-                  >
-                    {t.type === "deposit" ? "+" : "−"}
-                    {formatNumber(t.amount ?? 0)} {t.currency}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
       )}
     </div>
   );

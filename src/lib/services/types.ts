@@ -184,6 +184,34 @@ export interface CashBalanceView {
   balance: number;
 }
 
+/** One ledger event as it appears on the cash statement (D2, sprint §10/§14). */
+export interface CashEventView {
+  transaction_id: string;
+  trade_date: string;
+  trade_time: string | null;
+  type: TransactionType;
+  asset_id: string | null;
+  broker_id: string | null;
+  notes: string | null;
+  /** Signed cash effect in the statement currency (buys negative, D-013). */
+  amount_signed: number;
+  /** Running balance AFTER this event, in replay order. */
+  balance_after: number;
+}
+
+/**
+ * Statement per currency: opening (0 — the ledger is the full record) →
+ * events with running balance → closing. Closing MUST equal the engine's
+ * cash balance for the same (portfolio, currency) — tested, not assumed.
+ */
+export interface CashStatementView {
+  portfolio_id: string;
+  currency: string;
+  opening: number;
+  closing: number;
+  events: CashEventView[];
+}
+
 /**
  * Per-currency financial truth (shared read model — Bug 2/3 fix).
  * One row per NATIVE currency; nothing here is FX-converted (conversion is

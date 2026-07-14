@@ -29,7 +29,7 @@ export function NegativeCashNotice({ currencies }: { currencies: string[] }) {
           Record opening balance
         </Button>
         <Button size="sm" variant="ghost" asChild>
-          <Link href="/portfolio?tab=history">Review transactions</Link>
+          <Link href="/portfolio?tab=activity">Review transactions</Link>
         </Button>
       </div>
       <TransactionDialog

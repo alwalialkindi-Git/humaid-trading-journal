@@ -1,5 +1,6 @@
 import {
   calculatePositions,
+  compareTransactions,
   type EngineAsset,
   type EnginePortfolio,
   type EngineTransaction,
@@ -9,9 +10,11 @@ import type {
   AssetOverrideRow,
   AssetRow,
   CashBalanceView,
+  CashStatementView,
   CurrencySummaryRow,
   HoldingView,
   PortfolioSummaryView,
+  TransactionRow,
   WealthSummaryView,
 } from "./types";
 import { ServiceError } from "./errors";
@@ -167,6 +170,69 @@ export class PositionsService {
   }
 
   /**
+   * Cash statement per currency (D2): every cash-affecting ledger event in
+   * ENGINE replay order with a running balance. The cash-effect rules mirror
+   * the engine exactly (buy −(qty×price+fees) per D-013; sell +(qty×price−fees);
+   * dividend/deposit +amount; withdrawal/fee/zakat/purification −amount;
+   * adjustments and transfers never touch cash). The closing balance must
+   * equal the engine's cash balance — asserted by test, never assumed.
+   */
+  async getCashStatement(userId: string, portfolioId: string): Promise<CashStatementView[]> {
+    const portfolio = await this.repo.getPortfolio(userId, portfolioId);
+    if (!portfolio) throw new ServiceError("Portfolio not found.", "forbidden");
+
+    const rows = await this.repo.listTransactions(userId, { portfolioId });
+    const ordered = [...rows].sort((a, b) =>
+      compareTransactions(asEngineTx(a), asEngineTx(b))
+    );
+
+    const statements = new Map<string, { running: number; view: CashStatementView }>();
+    const statement = (currency: string) => {
+      let s = statements.get(currency);
+      if (!s) {
+        s = {
+          running: 0,
+          view: {
+            portfolio_id: portfolioId,
+            currency,
+            opening: 0,
+            closing: 0,
+            events: [],
+          },
+        };
+        statements.set(currency, s);
+      }
+      return s;
+    };
+
+    for (const t of ordered) {
+      const delta = cashDelta(t);
+      if (delta == null) continue; // adjustments/transfers/splits: no cash effect
+      const s = statement(t.currency.toUpperCase());
+      s.running += delta;
+      s.view.events.push({
+        transaction_id: t.id,
+        trade_date: t.trade_date,
+        trade_time: t.trade_time,
+        type: t.type,
+        asset_id: t.asset_id,
+        broker_id: t.broker_id,
+        notes: t.notes,
+        amount_signed: round2(delta),
+        balance_after: round2(s.running),
+      });
+    }
+
+    for (const s of statements.values()) {
+      s.view.closing = round2(s.running);
+    }
+
+    return [...statements.values()]
+      .map((s) => s.view)
+      .sort((a, b) => a.currency.localeCompare(b.currency));
+  }
+
+  /**
    * THE shared financial read model (Bug 2/3): both Wealth and Dashboard
    * render this — never their own arithmetic. Per-NATIVE-currency rows;
    * FX conversion happens strictly in the presentation layer (lib/fx).
@@ -301,4 +367,46 @@ export class PositionsService {
 
 function round2(v: number): number {
   return Math.round((v + Number.EPSILON) * 100) / 100;
+}
+
+/** Minimal engine shape for ordering only (compareTransactions reads dates). */
+function asEngineTx(t: TransactionRow): EngineTransaction {
+  return {
+    id: t.id,
+    portfolio_id: t.portfolio_id,
+    asset_id: t.asset_id,
+    type: t.type,
+    quantity: t.quantity,
+    price: t.price,
+    amount: t.amount,
+    fees: t.fees,
+    currency: t.currency,
+    trade_date: t.trade_date,
+    trade_time: t.trade_time,
+    created_at: t.created_at,
+  };
+}
+
+/**
+ * Signed cash effect of a ledger row; null = the type never touches cash.
+ * MUST stay in lockstep with the engine's adjustCash calls — the statement
+ * test asserts closing ≡ engine balance to catch any drift.
+ */
+function cashDelta(t: TransactionRow): number | null {
+  switch (t.type) {
+    case "buy":
+      return -((t.quantity ?? 0) * (t.price ?? 0) + t.fees);
+    case "sell":
+      return (t.quantity ?? 0) * (t.price ?? 0) - t.fees;
+    case "dividend":
+    case "deposit":
+      return t.amount ?? 0;
+    case "withdrawal":
+    case "fee":
+    case "zakat_payment":
+    case "purification_payment":
+      return -(t.amount ?? 0);
+    default:
+      return null; // adjustment / transfer_in / transfer_out / split
+  }
 }

@@ -1,6 +1,6 @@
 # CURRENT_STATE
 
-_Last updated: 2026-07-10 (start of D1a)_
+_Last updated: 2026-07-11 (D2 implementation complete — local commit, not pushed)_
 
 ## Production
 
@@ -19,6 +19,9 @@ _Last updated: 2026-07-10 (start of D1a)_
 - **Design constitution** (uncommitted until D1a commit): PRD, M1 design doc, Phase 5 UX review committed earlier; Design Sprint 1 (amended), Design Council Final Review (CIO 5 conditions + Irreplaceability Doctrine), AMANAH design system — approved and **frozen**.
 
 ## Current phase
+
+**D2 — Wealth redesign: COMPLETE (local commit, not pushed; awaiting owner review).** FinTable flagship (`ui/fin-table.tsx` + pure `lib/fin-table.ts`): closed column-type set, single-column sort (nulls last), density Comfortable 44 / Compact 32 remembered per table (useSyncExternalStore + localStorage), sticky header, per-currency footer aggregates (never mixed, §4.9), month group headers, declared mobile card transform, export seat (disabled until M4). Positions migrated onto it — every figure through the Figure primitive; price/value carry provenance (source · as-of · actor "You" on manual · derivation qty×price). AllocationBar (top-8 + Other, chart tokens, display-ccy via peg FX, unpriced/excluded named). StatBlock primitive; drawer restyled to three zones (identity / stat grid / ledger timeline with glyphs). NEW **Accounts tab** (per-broker ledger facts: recorded count, last activity, currencies; per-account holdings honestly deferred to M4). NEW **Cash statement** (`getCashStatement` service read model): per-currency opening → signed events with running balance → closing, engine replay order via `compareTransactions`, **closing ≡ engine balance tested**; sacred payments marked ◆. Tabs now Positions · Accounts · Cash · Activity (legacy `?tab=history` redirects). 119 tests (＋15: fin-table logic 9, cash statement 6). typecheck/lint/build ✔. Local boot verified (landing 200); authenticated Wealth pass = owner's production check post-push (no local credentials by design). Figma reference: system file `Thz2JywmZei5FKdrgT8Td0` (D-018 step-4 frames); B v3 exploration parked unratified in the Lab file — no AMANAH amendments.
+
 
 **D1a — LIVE in production** (`feae5bb`, verified: tokens/dual themes/boot script on prod; owner's authenticated pass ✔).
 

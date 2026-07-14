@@ -162,7 +162,7 @@ export default async function DashboardPage() {
               <CardDescription>Your latest ledger entries</CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/portfolio?tab=history">
+              <Link href="/portfolio?tab=activity">
                 View all <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
