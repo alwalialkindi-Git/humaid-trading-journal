@@ -56,12 +56,10 @@ export class PositionsService {
     const overrides = await this.repo.listOverrides(userId);
     const overrideByAsset = new Map(overrides.map((o) => [o.asset_id, o]));
 
-    // Allocation base: priced market value per portfolio, per currency-blind
-    // sum is wrong across currencies — M1 computes allocation within the
-    // portfolio in ASSET currency terms only when a single currency is
-    // present; mixed-currency allocation waits for FX (M2). Here: allocation
-    // over holdings sharing the portfolio, computed on priced values, with
-    // mixed currencies allowed but flagged by the summary's warnings.
+    // No allocation/weight here: a currency-blind sum is wrong across
+    // currencies (§4.9). Weights are derived at the presentation layer from
+    // display-currency values (lib/fin-table normalizeDisplayValues), the
+    // same normalized base the AllocationBar uses.
     const holdings: HoldingView[] = [];
 
     for (const p of positions) {
@@ -101,27 +99,9 @@ export class PositionsService {
             : null,
         realized_pnl: p.realized_pnl,
         dividends_received: p.dividends_received,
-        allocation_percent: null, // filled below once totals are known
         shariah_status: override?.shariah_status ?? "not_reviewed",
         shariah_is_override: override?.shariah_status != null,
       });
-    }
-
-    // Allocation % per portfolio over priced holdings.
-    const byPortfolio = new Map<string, HoldingView[]>();
-    for (const h of holdings) {
-      const list = byPortfolio.get(h.portfolio_id) ?? [];
-      list.push(h);
-      byPortfolio.set(h.portfolio_id, list);
-    }
-    for (const list of byPortfolio.values()) {
-      const total = list.reduce((s, h) => s + (h.market_value ?? 0), 0);
-      if (total > 0) {
-        for (const h of list) {
-          h.allocation_percent =
-            h.market_value != null ? round2((h.market_value / total) * 100) : null;
-        }
-      }
     }
 
     return holdings;

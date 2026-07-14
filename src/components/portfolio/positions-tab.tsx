@@ -19,7 +19,11 @@ import { useToast } from "@/components/ui/toaster";
 import { EmptyState } from "@/components/app/empty-state";
 import { TransactionDialog } from "@/components/transactions/transaction-dialog";
 import { AllocationBar } from "@/components/portfolio/allocation-bar";
-import { sumByCurrency } from "@/lib/fin-table";
+import {
+  normalizeDisplayValues,
+  sumByCurrency,
+  type DisplayNormalized,
+} from "@/lib/fin-table";
 import { formatDate, isStalePrice } from "@/lib/format";
 import {
   formatMoney,
@@ -108,6 +112,21 @@ export function PositionsTab({
     [open]
   );
 
+  // ONE normalized base (display currency, §4.9) feeds the Weight column,
+  // the drawer's Weight stat, cross-currency Value sorting, AND the
+  // AllocationBar — identical percentages by construction.
+  const normalized = useMemo(
+    () =>
+      normalizeDisplayValues(
+        open,
+        (h) => h.asset.id,
+        (h) => h.market_value,
+        (h) => h.asset.currency,
+        displayCurrency
+      ),
+    [open, displayCurrency]
+  );
+
   if (holdings.length === 0) {
     return (
       <EmptyState
@@ -188,7 +207,9 @@ export function PositionsTab({
       key: "value",
       header: "Value",
       type: "money",
-      sortValue: (h) => h.market_value,
+      // Sort on the FX-normalized display value — never on raw native
+      // figures across currencies. Unpriced/no-rate stay null → last.
+      sortValue: (h) => normalized.get(h.asset.id)?.displayValue ?? null,
       footer: (
         <span className="space-x-3">
           {valueTotals.map((t) => (
@@ -244,13 +265,15 @@ export function PositionsTab({
       header: "Weight",
       type: "percent",
       hideCompact: true,
-      sortValue: (h) => h.allocation_percent,
-      cell: (h) =>
-        h.allocation_percent != null ? (
-          <span className="figure-sm">{formatPercent(h.allocation_percent)}</span>
+      sortValue: (h) => normalized.get(h.asset.id)?.weightPercent ?? null,
+      cell: (h) => {
+        const weight = normalized.get(h.asset.id)?.weightPercent;
+        return weight != null ? (
+          <span className="figure-sm">{formatPercent(weight)}</span>
         ) : (
           <span className="text-ink-faint">—</span>
-        ),
+        );
+      },
     },
     {
       key: "shield",
@@ -265,7 +288,8 @@ export function PositionsTab({
   return (
     <>
       <AllocationBar
-        holdings={holdings}
+        holdings={open}
+        normalized={normalized}
         displayCurrency={displayCurrency}
         className="mb-5"
       />
@@ -326,6 +350,7 @@ export function PositionsTab({
           <SheetContent title={`${drawerHolding.asset.symbol} — ${drawerHolding.asset.name}`}>
             <PositionDetail
               holding={drawerHolding}
+              normalized={normalized.get(drawerHolding.asset.id) ?? null}
               transactions={transactions.filter((t) => t.asset_id === drawerHolding.asset.id)}
               onAct={(type) => {
                 setDialogPreset({
@@ -368,10 +393,12 @@ const TYPE_GLYPH: Record<string, string> = {
 
 function PositionDetail({
   holding: h,
+  normalized,
   transactions,
   onAct,
 }: {
   holding: HoldingView;
+  normalized: DisplayNormalized | null;
   transactions: TransactionRow[];
   onAct: (type: TransactionType) => void;
 }) {
@@ -475,8 +502,14 @@ function PositionDetail({
         />
         <StatBlock
           label="Weight"
-          figure={{ value: h.allocation_percent ?? 0, kind: "percent" }}
-          secondary={h.allocation_percent == null ? "unpriced" : undefined}
+          figure={{ value: normalized?.weightPercent ?? 0, kind: "percent" }}
+          secondary={
+            normalized?.weightPercent == null
+              ? normalized?.noRate
+                ? "no FX rate"
+                : "unpriced"
+              : undefined
+          }
         />
       </div>
 

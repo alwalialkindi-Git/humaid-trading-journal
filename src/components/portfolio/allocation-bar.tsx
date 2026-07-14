@@ -1,15 +1,15 @@
 import { cn } from "@/lib/utils";
-import { convertTotals, getFxProvider } from "@/lib/fx";
-import { allocationSegments } from "@/lib/fin-table";
+import { allocationSegments, type DisplayNormalized } from "@/lib/fin-table";
 import { formatMoney, formatPercentLabel, APPROX } from "@/lib/amanah/number";
 import type { HoldingView } from "@/lib/services";
 
 /**
  * AllocationBar — the signature composition visual (sprint §10/§23; the
  * donut is retired). 100% stacked horizontal, top-8 + "Other", labeled
- * segments. Weights are computed in the display currency via the read-layer
- * FX provider; holdings whose currency has no rate are EXCLUDED and named,
- * never zeroed (D-009). Chart colors come from the closed chart token set.
+ * segments. Values come from the SAME display-currency normalization the
+ * Weight column uses (lib/fin-table normalizeDisplayValues) — the bar and
+ * the column can never disagree. Holdings with no FX rate are EXCLUDED and
+ * named, never zeroed (D-009). Chart colors come from the chart token set.
  */
 
 const SEGMENT_TOKENS = [
@@ -22,34 +22,33 @@ const SEGMENT_TOKENS = [
 
 export function AllocationBar({
   holdings,
+  normalized,
   displayCurrency,
   className,
 }: {
+  /** Open positions only — the same set `normalized` was computed over. */
   holdings: HoldingView[];
+  /** Shared display-currency normalization (computed once by the caller). */
+  normalized: Map<string, DisplayNormalized>;
   displayCurrency: string;
   className?: string;
 }) {
-  const fx = getFxProvider();
-  const excludedCurrencies = new Set<string>();
-  let unpriced = 0;
+  const noRate: string[] = [];
+  const unpriced: string[] = [];
 
   const items = [];
   for (const h of holdings) {
     if (h.quantity <= 0) continue;
-    if (h.market_value == null) {
-      unpriced += 1;
+    const n = normalized.get(h.asset.id);
+    if (!n || n.displayValue == null) {
+      if (n?.noRate) {
+        noRate.push(`${h.asset.symbol} (${h.asset.currency.toUpperCase()})`);
+      } else {
+        unpriced.push(h.asset.symbol);
+      }
       continue;
     }
-    const converted = convertTotals(
-      [{ currency: h.asset.currency, amount: h.market_value }],
-      displayCurrency,
-      fx
-    );
-    if (converted.excluded.length > 0) {
-      excludedCurrencies.add(h.asset.currency.toUpperCase());
-      continue;
-    }
-    items.push({ label: h.asset.symbol, value: converted.total });
+    items.push({ label: h.asset.symbol, value: n.displayValue });
   }
 
   const segments = allocationSegments(items, 8);
@@ -103,11 +102,10 @@ export function AllocationBar({
           </span>
         ))}
       </div>
-      {(unpriced > 0 || excludedCurrencies.size > 0) && (
+      {(unpriced.length > 0 || noRate.length > 0) && (
         <p className="text-[11px] text-warn">
-          {unpriced > 0 && `${unpriced} unpriced holding${unpriced > 1 ? "s" : ""} excluded.`}
-          {excludedCurrencies.size > 0 &&
-            ` ${[...excludedCurrencies].join(", ")} excluded — no FX rate.`}
+          {unpriced.length > 0 && `${unpriced.join(", ")} excluded — unpriced.`}
+          {noRate.length > 0 && ` ${noRate.join(", ")} excluded — no FX rate.`}
         </p>
       )}
     </div>

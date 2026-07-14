@@ -48,10 +48,13 @@ export function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return "—";
+  // Calendar dates parse as UTC midnight; format in UTC so the rendered day
+  // never shifts with the machine timezone (server/client hydration parity).
   return d.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 

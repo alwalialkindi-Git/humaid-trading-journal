@@ -88,19 +88,33 @@ describe("percentages (§4.6)", () => {
   });
 });
 
-describe("timestamps (§4.8)", () => {
-  const now = new Date("2026-07-08T15:00:00").getTime();
+describe("timestamps (§4.8) — fixed display zone (GST, UTC+4)", () => {
+  // Inputs carry explicit offsets: output must not depend on the machine
+  // timezone (SSR hydration parity — React #418 regression, D2 smoke test).
+  const now = new Date("2026-07-08T15:00:00+04:00").getTime();
 
   it("same-day figures show HH:MM", () => {
-    expect(formatFigureTimestamp("2026-07-08T12:31:00", now)).toBe("12:31");
+    expect(formatFigureTimestamp("2026-07-08T12:31:00+04:00", now)).toBe("12:31");
   });
 
   it("older figures show day + month", () => {
-    expect(formatFigureTimestamp("2026-07-03T12:31:00", now)).toBe("3 Jul");
+    expect(formatFigureTimestamp("2026-07-03T12:31:00+04:00", now)).toBe("3 Jul");
   });
 
   it("provenance shows the full form", () => {
-    expect(formatFullTimestamp("2026-07-08T12:31:00")).toBe("8 Jul 2026, 12:31");
+    expect(formatFullTimestamp("2026-07-08T12:31:00+04:00")).toBe("8 Jul 2026, 12:31");
+  });
+
+  it("renders in the fixed display zone regardless of the machine zone (hydration safety)", () => {
+    // The same instant expressed in UTC and in GST must format identically:
+    // server (UTC) and client (any zone) produce the same text.
+    expect(formatFullTimestamp("2026-07-08T08:31:00Z")).toBe("8 Jul 2026, 12:31");
+    expect(formatFullTimestamp("2026-07-08T08:31:00Z")).toBe(
+      formatFullTimestamp("2026-07-08T12:31:00+04:00")
+    );
+    // Same-day boundary is evaluated in the display zone, not machine-local:
+    // 22:30 UTC on 8 Jul is already 9 Jul in GST → not "same day" as 15:00 GST 8 Jul.
+    expect(formatFigureTimestamp("2026-07-08T22:30:00Z", now)).toBe("9 Jul");
   });
 
   it("invalid input degrades to an em dash, never NaN", () => {

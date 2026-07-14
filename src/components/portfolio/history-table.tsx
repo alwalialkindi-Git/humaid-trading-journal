@@ -54,7 +54,9 @@ const TYPE_BADGE: Record<string, "success" | "warning" | "neutral" | "secondary"
 function monthLabel(tradeDate: string): string {
   const d = new Date(tradeDate);
   if (Number.isNaN(d.getTime())) return tradeDate;
-  return d.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  // UTC: trade_date is a calendar date — group labels must match between
+  // server render and client hydration regardless of machine timezone.
+  return d.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 }
 
 export function HistoryTable({

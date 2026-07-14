@@ -17,6 +17,14 @@ export const APPROX = "≈"; // ≈
 
 const LOCALE = "en-US"; // deterministic grouping ("1,234.50") across environments
 
+/**
+ * Display timezone for timestamps (§4.8). Fixed to Gulf Standard Time
+ * (UTC+4, no DST) — timestamp text must be byte-identical between the server
+ * render and client hydration (React #418 otherwise), so machine-local
+ * formatting is forbidden here. Becomes a profile preference when one exists.
+ */
+export const DISPLAY_TIME_ZONE = "Asia/Dubai";
+
 function groupFormat(value: number, minFrac: number, maxFrac: number): string {
   return new Intl.NumberFormat(LOCALE, {
     minimumFractionDigits: minFrac,
@@ -100,15 +108,21 @@ export function formatPercentLabel(value: number): string {
 export function formatFigureTimestamp(iso: string, now: number = Date.now()): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  const ref = new Date(now);
-  const sameDay =
-    d.getFullYear() === ref.getFullYear() &&
-    d.getMonth() === ref.getMonth() &&
-    d.getDate() === ref.getDate();
+  const dayInZone = (t: Date) =>
+    t.toLocaleDateString("en-CA", { timeZone: DISPLAY_TIME_ZONE });
+  const sameDay = dayInZone(d) === dayInZone(new Date(now));
   if (sameDay) {
-    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: DISPLAY_TIME_ZONE,
+    });
   }
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: DISPLAY_TIME_ZONE,
+  });
 }
 
 /** Full provenance timestamp (§4.8): "8 Jul 2026, 12:31". */
@@ -119,8 +133,13 @@ export function formatFullTimestamp(iso: string): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+    timeZone: DISPLAY_TIME_ZONE,
   });
-  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const time = d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: DISPLAY_TIME_ZONE,
+  });
   return `${date}, ${time}`;
 }
 

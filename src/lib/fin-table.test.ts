@@ -3,9 +3,11 @@ import {
   allocationSegments,
   densityStorageKey,
   nextSort,
+  normalizeDisplayValues,
   sortRows,
   sumByCurrency,
 } from "./fin-table";
+import { PegFxProvider } from "./fx";
 
 describe("sortRows", () => {
   const rows = [
@@ -100,6 +102,77 @@ describe("allocationSegments — top-N + other", () => {
         { label: "B", value: -5 },
       ])
     ).toEqual([]);
+  });
+});
+
+describe("normalizeDisplayValues — weights NEVER from mixed native currencies (§4.9)", () => {
+  const fx = new PegFxProvider();
+  // The exact production dataset that exposed the D2 bug: two AED holdings
+  // + one USD holding whose native figure is small but whose converted
+  // value is the largest position.
+  const holdings = [
+    { id: "emaar", value: 11860 as number | null, ccy: "AED" },
+    { id: "dib", value: 3885 as number | null, ccy: "AED" },
+    { id: "baba", value: 3718.28 as number | null, ccy: "USD" },
+  ];
+  const normalize = (rows: typeof holdings, display = "AED") =>
+    normalizeDisplayValues(
+      rows,
+      (r) => r.id,
+      (r) => r.value,
+      (r) => r.ccy,
+      display,
+      fx
+    );
+
+  it("converts each holding into the display currency before weighting", () => {
+    const out = normalize(holdings);
+    expect(out.get("baba")!.displayValue).toBe(13655.38); // 3,718.28 × 3.6725
+    expect(out.get("emaar")!.displayValue).toBe(11860);
+    // Correct mixed AED/USD weights (the buggy mixed-native sum gave 60.9/20.0/19.1):
+    expect(out.get("baba")!.weightPercent).toBe(46.4);
+    expect(out.get("emaar")!.weightPercent).toBe(40.3);
+    expect(out.get("dib")!.weightPercent).toBe(13.2);
+  });
+
+  it("produces the SAME percentages the AllocationBar renders", () => {
+    const out = normalize(holdings);
+    const segments = allocationSegments(
+      holdings.map((h) => ({ label: h.id, value: out.get(h.id)!.displayValue! })),
+      8
+    );
+    for (const seg of segments) {
+      expect(seg.percent).toBe(out.get(seg.label)!.weightPercent);
+    }
+  });
+
+  it("sorts by FX-normalized display value, not raw native figures", () => {
+    const rows = [...holdings, { id: "unpriced", value: null, ccy: "AED" }];
+    const out = normalize(rows);
+    const sorted = sortRows(rows, (r) => out.get(r.id)?.displayValue ?? null, "desc");
+    // Native-figure sorting wrongly ranked BABA (3,718.28 USD) below both
+    // AED holdings; normalized it is the largest. Nulls stay last.
+    expect(sorted.map((r) => r.id)).toEqual(["baba", "emaar", "dib", "unpriced"]);
+  });
+
+  it("excludes missing-rate holdings from the base — null weight, never zeroed", () => {
+    const rows = [...holdings, { id: "egp-asset", value: 5000 as number | null, ccy: "EGP" }];
+    const out = normalize(rows);
+    expect(out.get("egp-asset")).toEqual({
+      displayValue: null,
+      weightPercent: null,
+      noRate: true,
+    });
+    // Convertible holdings keep the same weights as without the EGP row.
+    expect(out.get("baba")!.weightPercent).toBe(46.4);
+    // And the missing-rate row sorts last alongside unpriced rows.
+    const sorted = sortRows(rows, (r) => out.get(r.id)?.displayValue ?? null, "desc");
+    expect(sorted.at(-1)!.id).toBe("egp-asset");
+  });
+
+  it("unpriced rows carry noRate=false so exclusions are named for the right reason", () => {
+    const out = normalize([{ id: "x", value: null, ccy: "AED" }]);
+    expect(out.get("x")).toEqual({ displayValue: null, weightPercent: null, noRate: false });
   });
 });
 

@@ -1,8 +1,11 @@
+import { convertTotals, getFxProvider, type FxProvider } from "@/lib/fx";
+
 /**
  * FinTable logic — pure module (AMANAH §5, sprint §22).
  * The flagship table's behavior lives here so it is unit-testable without
  * DOM: sorting, per-currency aggregation (mixed currencies are NEVER summed,
- * §4.9), density persistence keys, and the AllocationBar's top-N+other math.
+ * §4.9), density persistence keys, display-currency normalization for weights
+ * and cross-currency sorting, and the AllocationBar's top-N+other math.
  */
 
 export type FinDensity = "comfortable" | "compact";
@@ -69,6 +72,72 @@ export function sumByCurrency<T>(
   return [...totals.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([c, total]) => ({ currency: c, total }));
+}
+
+// ---------------------------------------------------------------------------
+// Display-currency normalization (§4.9) — ONE source for weights and sorting
+// ---------------------------------------------------------------------------
+
+export interface DisplayNormalized {
+  /** Market value converted to the display currency; null when unpriced or no FX rate. */
+  displayValue: number | null;
+  /**
+   * Share of the included (priced + convertible, positive) total, 1dp —
+   * the same rounding as allocationSegments, so the Weight column and the
+   * AllocationBar can never disagree. Null when displayValue is null.
+   */
+  weightPercent: number | null;
+  /** True when the row's currency has no FX rate to the display currency (excluded, never zeroed). */
+  noRate: boolean;
+}
+
+/**
+ * Convert per-row native values into the display currency and derive weights
+ * from THAT normalized base — portfolio weights are never computed from mixed
+ * native currencies (§4.9). Rows that cannot be converted (unpriced, or no FX
+ * rate) get null weight and are excluded from the base, never treated as zero.
+ */
+export function normalizeDisplayValues<T>(
+  rows: readonly T[],
+  key: (row: T) => string,
+  value: (row: T) => number | null,
+  currency: (row: T) => string,
+  displayCurrency: string,
+  fx: FxProvider = getFxProvider()
+): Map<string, DisplayNormalized> {
+  const out = new Map<string, DisplayNormalized>();
+  for (const row of rows) {
+    const v = value(row);
+    if (v == null) {
+      out.set(key(row), { displayValue: null, weightPercent: null, noRate: false });
+      continue;
+    }
+    const converted = convertTotals(
+      [{ currency: currency(row), amount: v }],
+      displayCurrency,
+      fx
+    );
+    if (converted.excluded.length > 0) {
+      out.set(key(row), { displayValue: null, weightPercent: null, noRate: true });
+      continue;
+    }
+    out.set(key(row), { displayValue: converted.total, weightPercent: null, noRate: false });
+  }
+
+  // Weight base mirrors allocationSegments: positive display values only.
+  let total = 0;
+  for (const n of out.values()) {
+    if (n.displayValue != null && n.displayValue > 0) total += n.displayValue;
+  }
+  if (total > 0) {
+    for (const n of out.values()) {
+      if (n.displayValue != null) {
+        n.weightPercent =
+          n.displayValue > 0 ? round1((n.displayValue / total) * 100) : 0;
+      }
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

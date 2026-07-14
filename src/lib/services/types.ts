@@ -171,8 +171,6 @@ export interface HoldingView {
   unrealized_pnl_percent: number | null;
   realized_pnl: number;
   dividends_received: number;
-  /** Share of the portfolio's priced market value; null when unpriced. */
-  allocation_percent: number | null;
   /** M1: from the user's override only; the M3 screening engine replaces this. */
   shariah_status: "compliant" | "doubtful" | "non_compliant" | "not_reviewed";
   shariah_is_override: boolean;
