@@ -1,7 +1,7 @@
 # NEXT_TASK — D2: Wealth Redesign
 
-> **STATUS: COMPLETE (committed locally, not pushed). Awaiting owner review.**
-> On approval + push + owner's authenticated production pass, the next task is
+> **STATUS: D2 COMPLETE — live in production (`a688a4d` + smoke-test fixes `892bb24`),
+> authenticated production pass ✔ 2026-07-14.** The next task is
 > **D3 — Transaction flow** (sprint §28/§11): dialog compaction (segmented type
 > row), TicketLine summary, save-settle moment (row settles with 2s highlight),
 > keyboard completeness, asset-search row alignment. Logic untouched — the
