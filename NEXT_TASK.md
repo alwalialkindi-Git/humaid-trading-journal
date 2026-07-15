@@ -1,12 +1,10 @@
 # NEXT_TASK — D3: Transaction flow
 
-> **STATUS: D3 LIVE (`26829df`) — authenticated production smoke test PASSED
-> except two defects, both FIXED in a local commit that is NOT pushed:**
-> (1) Cash/Obligation menu items ignored mouse clicks (popover needed `modal`
-> under the modal dialog); (2) Escape reached the close guard before clearing
-> search results (now consumed via dialog `onEscapeKeyDown`).
-> Next action is the owner's: approve → push fixes → re-check those two paths.
-> After that, **D4** per sprint §28.
+> **STATUS: D3 COMPLETE — live in production (`26829df` + smoke fixes `7dfc63b`),
+> full authenticated production pass ✔ 2026-07-15, including re-verification of
+> both smoke-fix regressions (mouse-clickable Cash/Obligation menus; Escape
+> clears search results first, closes only when none remain).**
+> The next task is **D4** per sprint §28 — not started; awaiting owner go-ahead.
 
 ## Delivered scope (D3 — sprint §28/§11; logic untouched)
 
