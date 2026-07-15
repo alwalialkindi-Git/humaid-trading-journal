@@ -108,7 +108,9 @@ describe("no legacy tables in current financial summaries (tripwire)", () => {
     const src = read("src/app/(app)/dashboard/page.tsx");
     expect(src).not.toMatch(/from\(["'](trades|holdings|dividends)["']\)/);
     expect(src).toContain("getWealthSummary");
-    expect(src).toContain("SummaryCards");
+    // D4: the WealthStrip renders the shared read model on the dashboard
+    // (the Wealth page keeps SummaryCards — same rows, same truth).
+    expect(src).toContain("WealthStrip");
   });
 
   it("wealth page renders the same shared read model", () => {

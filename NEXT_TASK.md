@@ -1,39 +1,57 @@
-# NEXT_TASK — D3: Transaction flow
+# NEXT_TASK — D4: Dashboard ("the 60-second review")
 
-> **STATUS: D3 COMPLETE — live in production (`26829df` + smoke fixes `7dfc63b`),
-> full authenticated production pass ✔ 2026-07-15, including re-verification of
-> both smoke-fix regressions (mouse-clickable Cash/Obligation menus; Escape
-> clears search results first, closes only when none remain).**
-> The next task is **D4** per sprint §28 — not started; awaiting owner go-ahead.
+> **STATUS: D4 IMPLEMENTED — local commit, NOT pushed.
+> Awaiting owner review → push → owner's authenticated production pass.**
+> After D4 is verified live, the next task is **D5 — Islamic finance center**
+> per sprint §28.
 
-## Delivered scope (D3 — sprint §28/§11; logic untouched)
+## Delivered scope (D4 — sprint §28/§9, fuses milestone Phase 6 dashboard)
 
-- **Dialog compaction**: type switcher is one segmented row —
-  Buy · Sell · Div · Cash ▾ · Obligation ▾ (`type-segment-row.tsx`); menu segments show
-  the chosen subtype; sell segment disabled without open positions; Buy preselected,
-  cursor in asset search (kept). Dialog 560px desktop, bottom sheet on mobile. Sacred
-  copy moved to the brass accent (◆, `sacred`/`sacred-surface`).
-- **TicketLine**: pure builder `lib/transactions/ticket.ts` + `ticket-line.tsx` — live
-  sentence above the footer in AMANAH §4 figures; sells carry the engine P&L preview
-  (same `previewSellRealizedPnl` export; the old preview box removed, not duplicated);
-  **the same builder's text is the success toast** (falls back to the Bug-1 constant).
-- **Save-settle moment**: `lib/transactions/settle.ts` (10s freshness window); the dialog
-  marks the written row id; `FinTable` gained `highlightKey` + mobileCard meta; Activity
-  settles the row with the 2s `animate-settle` verb, then consumes the flag.
-- **Keyboard completeness**: global `N` opens Add Transaction (never while typing or a
-  dialog is open); ⌘/Ctrl+Enter submits; Escape clears open search results before the
-  dialog close guard; segmented row is a roving radiogroup (←/→/Home/End).
-- **Asset-search row alignment**: results table-aligned — shield placeholder (dashed
-  not-screened, sr-only label) / symbol / name / exchange / country·ccy grid columns;
-  warned rows stay amber with the confirm step (§8.8 logic unchanged).
+- **WealthStrip** (hero): display-currency total in `figure-xl` from the SAME
+  `getWealthSummary` rows as Wealth (≈ secondary, native truth line, missing-FX
+  excluded and named, provenance on the figure). Global period selector
+  (D/W/M/YTD/1Y, persisted at `amanah:period`); period change + sparkline slots
+  render "insufficient history" until the M2 daily valuation series (CIO
+  condition 1 — never an approximation). Tripwire test now requires
+  `getWealthSummary` + `WealthStrip` on the dashboard.
+- **AttentionQueue** (`lib/attention.ts` pure + tested): one component replaces
+  the banner stacks (hawl banner, NegativeCashNotice, shariah-status card).
+  Tiers obligation > integrity > freshness > housekeeping; items — hawl ≤ 30d,
+  purification owed (accrued − paid, ledger-derived), non-compliant, unscreened,
+  negative cash, stale prices (>24h, manual prices exempt), unpriced. Max 5 +
+  "view all"; snooze 7d (localStorage) for everything EXCEPT obligations —
+  never snoozable, brass ◆. Empty state: "All quiet, alhamdulillah."
+- **ExposureBand**: `SegmentBar` extracted from AllocationBar (Wealth API
+  unchanged); dimension toggle Asset · Class · Currency; top-3 concentration,
+  liquidity split (listed/unlisted — `is_listed` added to HoldingView, ◇A6),
+  currency split, compliance shield summary — all from the ONE
+  `normalizeDisplayValues` base (§4.9).
+- **FlowsRow**: cash per currency (shared read-model rows), income (dividends
+  MTD/YTD on the UTC calendar + purification owed ◆; `lib/dashboard.ts`
+  incomeSummary, pure + tested), zakat tile (brass; real hawl countdown;
+  accrual estimate honestly pending until the M4 engine).
+- **Recent activity** restyled to the D2 timeline glyph language (sacred types
+  ◆) and **ledger-native insights** (`generateLedgerInsights`: concentration
+  >35 %, strongest/weakest ≥ ±10 %, income YTD; max 3 shown; InsightCards
+  re-tokened for both themes).
+
+## Honest deferrals (queue sources & seats, not placeholders)
+
+Reconciliation due (M4 import) · unannotated trades (journal rebuild, Phase 7) ·
+research follow-ups (M5.5) · account/label exposure grouping (M4/M5.5) ·
+period figures + sparkline (M2 valuation series) · zakat accrual estimate (M4) ·
+wealth-strip settle-on-change (needs a change signal; motion §26 forbids
+settle on load).
 
 ## Regression baseline (verified by existing tests, all passing)
 
-Draft-guard (dirty close → confirm; failure preserves fields), sell preview ≡ engine,
-ADIB / warned cross-exchange confirmation flow.
+One financial truth: dashboard reads only ledger read models (tripwire), weights
+≡ AllocationBar ≡ Weight column (shared normalization), per-currency sums never
+mixed (§4.9), cash statement ≡ engine balance.
 
 ## Verified
 
-typecheck / lint / build / **143 tests** ✔ (＋18: ticket builder 12, settle store 6).
-`/portfolio` requires Supabase env (none locally by design) — the authenticated dialog
-pass is the owner's production check post-push.
+typecheck / lint / build / **164 tests** ✔ (＋21: dashboard math 12, attention
+queue 9). Local boot: landing 200; `/dashboard` requires Supabase env (none
+locally by design) — the authenticated dashboard pass is the owner's production
+check post-push.

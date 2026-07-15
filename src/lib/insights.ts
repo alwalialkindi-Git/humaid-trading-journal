@@ -6,6 +6,10 @@ import {
 } from "./calculations";
 import { computeZakat, type ZakatInputs } from "./zakat";
 import { formatCurrency, titleCase } from "./format";
+import { formatMoney, formatPercent } from "./amanah/number";
+import { normalizeDisplayValues } from "./fin-table";
+import type { IncomeSummaryRow } from "./dashboard";
+import type { HoldingView } from "./services";
 import { MISTAKE_LABELS, type Mistake } from "./types";
 import type { Trade, Holding, Dividend, Profile } from "./types";
 
@@ -129,6 +133,94 @@ export function generateInsights(params: {
         detail: `Profit factor is ${stats.profitFactor.toFixed(2)}. Review your worst trades and check which mistakes repeat.`,
       });
     }
+  }
+
+  return insights;
+}
+
+/**
+ * Ledger-native insights (D4, §9.5) — the same rule-based shape, computed
+ * from the ledger read models only (never the legacy tables). Weights come
+ * from the ONE display-currency normalization (§4.9). The dashboard shows
+ * at most 3.
+ */
+export function generateLedgerInsights(params: {
+  /** Open positions. */
+  holdings: HoldingView[];
+  income: IncomeSummaryRow[];
+  displayCurrency: string;
+}): Insight[] {
+  const { holdings, income, displayCurrency } = params;
+  const insights: Insight[] = [];
+
+  const normalized = normalizeDisplayValues(
+    holdings,
+    (h) => h.asset.id,
+    (h) => h.market_value,
+    (h) => h.asset.currency,
+    displayCurrency
+  );
+
+  // Concentration: one asset above 35% of the priced base.
+  let heaviest: { h: HoldingView; weight: number } | null = null;
+  for (const h of holdings) {
+    const weight = normalized.get(h.asset.id)?.weightPercent;
+    if (weight != null && (heaviest == null || weight > heaviest.weight)) {
+      heaviest = { h, weight };
+    }
+  }
+  if (heaviest && heaviest.weight > 35) {
+    insights.push({
+      id: "concentration",
+      tone: "warning",
+      title: `High exposure to ${heaviest.h.asset.symbol}`,
+      detail: `${formatPercent(heaviest.weight)} of your priced portfolio sits in one asset. Concentration is a decision — make sure it is yours.`,
+    });
+  }
+
+  // Strongest / weakest priced position by unrealized %.
+  const priced = holdings.filter(
+    (h) => h.unrealized_pnl != null && h.unrealized_pnl_percent != null
+  );
+  const byPct = [...priced].sort(
+    (a, b) => (b.unrealized_pnl_percent ?? 0) - (a.unrealized_pnl_percent ?? 0)
+  );
+  const best = byPct[0];
+  if (best && (best.unrealized_pnl_percent ?? 0) >= 10) {
+    insights.push({
+      id: "top-gainer",
+      tone: "positive",
+      title: `${best.asset.symbol} is your strongest position`,
+      detail: `Unrealized ${formatPercent(best.unrealized_pnl_percent!, { delta: true })} (${formatMoney(best.unrealized_pnl!, best.asset.currency)}) against average cost.`,
+    });
+  }
+  const worst = byPct[byPct.length - 1];
+  if (worst && worst !== best && (worst.unrealized_pnl_percent ?? 0) <= -10) {
+    insights.push({
+      id: "top-loser",
+      tone: "negative",
+      title: `${worst.asset.symbol} is your weakest position`,
+      detail: `Unrealized ${formatPercent(worst.unrealized_pnl_percent!, { delta: true })} (${formatMoney(worst.unrealized_pnl!, worst.asset.currency)}). Revisit the thesis before averaging down.`,
+    });
+  }
+
+  // Dividend income this year, per native currency.
+  const ytd = income.filter((r) => r.dividends_ytd > 0);
+  if (ytd.length > 0) {
+    const owed = income.filter((r) => r.purification_owed > 0);
+    insights.push({
+      id: "income-ytd",
+      tone: "neutral",
+      title: `Dividend income this year: ${ytd
+        .map((r) => formatMoney(r.dividends_ytd, r.currency))
+        .join(" · ")}`,
+      detail:
+        owed.length > 0
+          ? `Purification owed: ${owed
+              .map((r) => formatMoney(r.purification_owed, r.currency))
+              .join(" · ")} — record the payment to settle it.`
+          : "All recorded in your ledger — purification is settled.",
+    });
   }
 
   return insights;

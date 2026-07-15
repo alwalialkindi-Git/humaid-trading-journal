@@ -84,6 +84,7 @@ export class PositionsService {
           data_tier: asset.data_tier,
           provider: asset.provider,
           provider_symbol: asset.provider_symbol,
+          is_listed: asset.is_listed,
         },
         quantity: p.quantity,
         average_cost: p.average_cost,

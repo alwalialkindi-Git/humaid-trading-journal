@@ -158,6 +158,8 @@ export interface HoldingView {
     data_tier: DataTier;
     provider: string | null;
     provider_symbol: string | null;
+    /** Listed on a real exchange — the dashboard's liquidity split (◇A6). */
+    is_listed: boolean;
   };
   quantity: number;
   average_cost: number;
