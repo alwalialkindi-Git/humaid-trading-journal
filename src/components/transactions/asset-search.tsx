@@ -9,6 +9,7 @@ import type { AssetRow } from "@/lib/services";
 import { ensureAssetFromSearchAction } from "@/app/(app)/portfolio/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ShieldIcon } from "@/components/ui/shield-badge";
 import { CustomAssetPanel, type CustomAssetPrefillInput } from "./custom-asset-panel";
 
 /**
@@ -16,6 +17,10 @@ import { CustomAssetPanel, type CustomAssetPrefillInput } from "./custom-asset-p
  * every result shows exchange/country/currency; warned cross-exchange
  * results need explicit confirmation; ADX queries surface the prefilled
  * "create custom UAE asset" path; the custom path is never hidden.
+ *
+ * D3 (§11): results are table-aligned (shield placeholder / symbol / name /
+ * exchange / ccy columns); Escape clears the open results before it can
+ * reach the dialog's close guard. All selection logic unchanged.
  */
 
 export interface SelectedAsset {
@@ -102,6 +107,15 @@ export function AssetSearch({
   }
 
   function handleKeyDown(e: React.KeyboardEvent, response: SearchResponse) {
+    if (e.key === "Escape") {
+      // Keyboard completeness (§11): Escape dismisses the results first —
+      // it must not fall through to the dialog's close guard.
+      e.preventDefault();
+      e.stopPropagation();
+      setQuery("");
+      setPhase({ kind: "idle" });
+      return;
+    }
     const n = response.results.length;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -246,29 +260,34 @@ export function AssetSearch({
                   onClick={() => pick(r, response)}
                   onMouseEnter={() => setActiveIndex(i)}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm",
+                    // §11: table-aligned result columns — shield placeholder /
+                    // symbol / name / exchange / country·ccy.
+                    "grid w-full grid-cols-[1rem_5.5rem_minmax(0,1fr)_auto_6.5rem] items-center gap-x-2.5 px-3 py-2.5 text-left text-sm",
                     i === activeIndex ? "bg-accent" : "hover:bg-muted/60",
                     r.warning && "bg-amber-50/70 hover:bg-amber-100/70"
                   )}
                 >
-                  <span className="min-w-0">
-                    <span className="font-medium">{r.symbol}</span>
-                    <span className="ml-2 truncate text-muted-foreground">{r.name}</span>
-                    {r.warning && (
-                      <span className="mt-0.5 flex items-center gap-1 text-xs text-amber-800">
-                        <AlertTriangle className="h-3 w-3 shrink-0" />
-                        Different exchange — needs confirmation
-                      </span>
-                    )}
+                  <span
+                    className="text-compliance-unknown"
+                    title="Not screened — screening arrives with M3"
+                  >
+                    <ShieldIcon state="not_reviewed" />
+                    <span className="sr-only">Not screened</span>
                   </span>
-                  <span className="shrink-0 text-right text-xs text-muted-foreground">
-                    <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">
-                      {r.exchange.code}
-                    </span>
-                    <span className="mt-0.5 block">
-                      {r.exchange.country} · {r.exchange.currency}
-                    </span>
+                  <span className="truncate font-medium">{r.symbol}</span>
+                  <span className="truncate text-muted-foreground">{r.name}</span>
+                  <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium">
+                    {r.exchange.code}
                   </span>
+                  <span className="text-right text-xs text-muted-foreground">
+                    {r.exchange.country} · {r.exchange.currency}
+                  </span>
+                  {r.warning && (
+                    <span className="col-[2/-1] mt-0.5 flex items-center gap-1 text-xs text-amber-800">
+                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                      Different exchange — needs confirmation
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

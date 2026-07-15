@@ -50,6 +50,18 @@ export function CommandMenu() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((v) => !v);
+        return;
+      }
+      // D3 (§11) keyboard entry: N opens Add Transaction — never while
+      // typing in a field or while any dialog is already open.
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "n") {
+        const el = e.target as HTMLElement | null;
+        if (el && (el.isContentEditable || el.closest("input, textarea, select"))) {
+          return;
+        }
+        if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+        e.preventDefault();
+        setTxOpen(true);
       }
     }
     function onSummon() {

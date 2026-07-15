@@ -25,7 +25,7 @@ const SHIELD_META: Record<
 
 const SHIELD_OUTLINE = "M8 1.5 L13.5 3.5 V8 C13.5 11.2 11.2 13.6 8 14.5 C4.8 13.6 2.5 11.2 2.5 8 V3.5 Z";
 
-function ShieldIcon({ state, className }: { state: ComplianceState; className?: string }) {
+export function ShieldIcon({ state, className }: { state: ComplianceState; className?: string }) {
   return (
     <svg
       viewBox="0 0 16 16"

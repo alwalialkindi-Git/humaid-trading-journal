@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Pencil, ReceiptText, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,7 @@ import { TransactionDialog } from "@/components/transactions/transaction-dialog"
 import { formatDate, titleCase } from "@/lib/format";
 import { formatMoney, formatQuantity, formatUnitPrice } from "@/lib/amanah/number";
 import { sumByCurrency } from "@/lib/fin-table";
+import { clearSettled, getSettledId, subscribeSettled } from "@/lib/transactions/settle";
 
 export interface AssetLabel {
   symbol: string;
@@ -81,6 +82,19 @@ export function HistoryTable({
   const [deleting, setDeleting] = useState<TransactionRow | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Save-settle moment (D3 §11): the row the dialog just wrote settles in
+  // with the 2s highlight, then the flag is consumed.
+  const settledId = useSyncExternalStore(
+    subscribeSettled,
+    () => getSettledId(),
+    () => null
+  );
+  useEffect(() => {
+    if (!settledId) return;
+    const t = setTimeout(clearSettled, 2500);
+    return () => clearTimeout(t);
+  }, [settledId]);
 
   const brokerById = useMemo(() => new Map(brokers.map((b) => [b.id, b])), [brokers]);
   const assetIds = useMemo(
@@ -322,10 +336,11 @@ export function HistoryTable({
           rowKey={(t) => t.id}
           groupBy={(t) => monthLabel(t.trade_date)}
           toolbar={filters}
-          mobileCard={(t) => {
+          highlightKey={settledId}
+          mobileCard={(t, meta) => {
             const label = t.asset_id ? assetLabels[t.asset_id] : null;
             return (
-              <div className="rounded-lg border bg-card p-4">
+              <div className={cn("rounded-lg border bg-card p-4", meta.highlight && "animate-settle")}>
                 <div className="flex items-center justify-between">
                   <span>
                     <Badge variant={TYPE_BADGE[t.type] ?? "neutral"}>{titleCase(t.type)}</Badge>

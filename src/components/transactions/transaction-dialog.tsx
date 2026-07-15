@@ -40,26 +40,22 @@ import {
   submitOutcome,
   type DraftSnapshot,
 } from "@/lib/transactions/draft";
+import { buildTicketLine, parseFigure } from "@/lib/transactions/ticket";
+import { markSettled } from "@/lib/transactions/settle";
 import { AssetSearch, type SelectedAsset } from "./asset-search";
 import { BrokerSelect } from "./broker-select";
+import { TicketLine } from "./ticket-line";
+import { TypeSegmentRow } from "./type-segment-row";
 
 /**
- * Add/Edit Transaction dialog — Phase 5 "The Loop" write path (§9.2).
- * One shell, per-type field groups, submit → server action → services →
- * engine trial recompute. Client validation is convenience; the service
- * layer is the law; engine messages render verbatim.
+ * Add/Edit Transaction dialog — Phase 5 "The Loop" write path (§9.2),
+ * compacted in D3 (§11): segmented type row, live TicketLine (the user
+ * confirms a sentence; it becomes the toast on save), save-settle moment
+ * (the written row settles into Activity with the 2s highlight), ⌘/Ctrl+Enter
+ * submits. One shell, per-type field groups, submit → server action →
+ * services → engine trial recompute. Client validation is convenience; the
+ * service layer is the law; engine messages render verbatim.
  */
-
-const TYPE_OPTIONS: { value: TransactionType; label: string; group: string }[] = [
-  { value: "buy", label: "Buy", group: "Trade" },
-  { value: "sell", label: "Sell", group: "Trade" },
-  { value: "dividend", label: "Dividend", group: "Income" },
-  { value: "deposit", label: "Deposit", group: "Cash" },
-  { value: "withdrawal", label: "Withdraw", group: "Cash" },
-  { value: "fee", label: "Fee", group: "Cash" },
-  { value: "zakat_payment", label: "Zakat payment", group: "Obligation" },
-  { value: "purification_payment", label: "Purification", group: "Obligation" },
-];
 
 const SACRED_COPY: Partial<Record<TransactionType, string>> = {
   zakat_payment: "Recording a zakat payment — may it be accepted.",
@@ -294,6 +290,59 @@ export function TransactionDialog({
     });
   }, [type, sellSource, quantity, price, fees]);
 
+  // The ticket line (§11) — one builder feeds the summary AND the toast.
+  const activeAssetSymbol =
+    type === "buy"
+      ? (selectedAsset?.asset.symbol ??
+        presetBuyAsset?.symbol ??
+        edit?.assetLabel?.symbol ??
+        null)
+      : type === "sell"
+        ? (sellSource?.asset.symbol ?? edit?.assetLabel?.symbol ?? null)
+        : type === "dividend"
+          ? (dividendSource?.asset.symbol ?? edit?.assetLabel?.symbol ?? null)
+          : null;
+  const ticket = useMemo(
+    () =>
+      buildTicketLine({
+        type,
+        assetSymbol: activeAssetSymbol,
+        quantity: parseFigure(quantity),
+        price: parseFigure(price),
+        amount: parseFigure(amount),
+        fees: Number(fees) || 0,
+        currency: effectiveCurrency(),
+        tradeDate,
+        portfolioName:
+          context?.portfolios.find((p) => p.id === portfolioId)?.name ?? null,
+        brokerName: brokerId
+          ? (context?.brokers.find((b) => b.id === brokerId)?.name ?? null)
+          : null,
+        realizedPnl:
+          type === "sell" && preview?.valid ? preview.realizedPnl : null,
+      }),
+    // effectiveCurrency reads only state already listed here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      type,
+      activeAssetSymbol,
+      quantity,
+      price,
+      amount,
+      fees,
+      currency,
+      tradeDate,
+      portfolioId,
+      brokerId,
+      context,
+      preview,
+      selectedAsset,
+      presetBuyAsset,
+      sellSource,
+      dividendSource,
+    ]
+  );
+
   function effectiveCurrency(): string {
     if (type === "buy") {
       return (
@@ -375,13 +424,14 @@ export function TransactionDialog({
     localStorage.setItem("htj.lastPortfolio", portfolioId);
     if (brokerId) localStorage.setItem("htj.lastBroker", brokerId);
 
-    if (outcome.toast) toast(outcome.toast);
+    // Save-settle moment (§11): the written row settles into Activity with
+    // the 2s highlight; the ticket line becomes the toast content.
+    if (res.ok) markSettled(res.data.id);
+    if (outcome.toast) toast(ticket?.toast ?? outcome.toast);
     reset();
     onOpenChange(false);
     router.refresh();
   }
-
-  const groups = [...new Set(TYPE_OPTIONS.map((t) => t.group))];
 
   return (
     <Dialog
@@ -393,7 +443,8 @@ export function TransactionDialog({
         if (!next) requestClose();
       }}
     >
-      <DialogContent className="max-w-xl">
+      {/* §11: desktop dialog 560px; mobile full sheet (bottom-anchored). */}
+      <DialogContent className="max-w-[560px] max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-b-none">
         {confirmDiscard && (
           <div
             role="alertdialog"
@@ -437,50 +488,35 @@ export function TransactionDialog({
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            {/* Type switcher — grouped chips (radiogroup) */}
+          <form
+            onSubmit={handleSubmit}
+            noValidate
+            className="space-y-4"
+            onKeyDown={(e) => {
+              // Keyboard completeness (§11): ⌘/Ctrl+Enter saves from any field.
+              if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.requestSubmit();
+              }
+            }}
+          >
+            {/* Type switcher — one compact segmented row (§11) */}
             {!isEdit && (
-              <div role="radiogroup" aria-label="Transaction type" className="space-y-2">
-                {groups.map((group) => (
-                  <div key={group} className="flex flex-wrap items-center gap-1.5">
-                    <span className="w-20 shrink-0 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      {group}
-                    </span>
-                    {TYPE_OPTIONS.filter((t) => t.group === group).map((t) => {
-                      const disabled = t.value === "sell" && openPositions.length === 0;
-                      return (
-                        <button
-                          key={t.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={type === t.value}
-                          disabled={disabled}
-                          title={disabled ? "No open positions to sell" : undefined}
-                          onClick={() => {
-                            setType(t.value);
-                            setPositionAssetId("");
-                            setFormError(null);
-                          }}
-                          className={cn(
-                            "rounded-full border px-3 py-1 text-sm transition-colors",
-                            type === t.value
-                              ? "border-primary bg-primary text-primary-foreground"
-                              : "bg-card hover:bg-muted",
-                            disabled && "cursor-not-allowed opacity-40"
-                          )}
-                        >
-                          {t.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
+              <TypeSegmentRow
+                value={type}
+                sellDisabled={openPositions.length === 0}
+                onChange={(t) => {
+                  setType(t);
+                  setPositionAssetId("");
+                  setFormError(null);
+                }}
+              />
             )}
 
             {SACRED_COPY[type] && (
-              <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-                {SACRED_COPY[type]}
+              // Sacred types keep their copy; confirmation carries the brass accent (§11).
+              <p className="rounded-md bg-sacred-surface px-3 py-2 text-sm text-sacred">
+                ◆ {SACRED_COPY[type]}
               </p>
             )}
 
@@ -667,21 +703,6 @@ export function TransactionDialog({
               }
             />
 
-            {/* Sell preview — engine code, cannot disagree with the server */}
-            {type === "sell" && preview?.valid && (
-              <p
-                className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium",
-                  preview.realizedPnl >= 0
-                    ? "bg-emerald-50 text-emerald-800"
-                    : "bg-red-50 text-red-700"
-                )}
-              >
-                Realized P&L preview: {preview.realizedPnl >= 0 ? "+" : ""}
-                {preview.realizedPnl} {effectiveCurrency()}
-              </p>
-            )}
-
             {/* More details */}
             <div>
               <button
@@ -720,6 +741,10 @@ export function TransactionDialog({
                 </div>
               )}
             </div>
+
+            {/* The ticket line (§11) — sell P&L preview rides here (engine code,
+                cannot disagree with the server). */}
+            <TicketLine ticket={ticket} />
 
             {formError && (
               <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">

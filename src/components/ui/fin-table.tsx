@@ -49,6 +49,11 @@ export interface FinCellContext {
   density: FinDensity;
 }
 
+export interface FinRowMeta {
+  /** True for the just-written row while the settle highlight is owed. */
+  highlight: boolean;
+}
+
 export interface FinColumn<T> {
   key: string;
   header: React.ReactNode;
@@ -77,8 +82,12 @@ export interface FinTableProps<T> {
   rowAriaLabel?: (row: T) => string;
   /** Toolbar left side (filters). The density toggle renders on the right. */
   toolbar?: React.ReactNode;
-  /** The §5 mobile card transform — declared once per table. */
-  mobileCard: (row: T) => React.ReactNode;
+  /** The §5 mobile card transform — declared once per table. The card styles
+   * its own settle highlight from meta (cards own their background). */
+  mobileCard: (row: T, meta: FinRowMeta) => React.ReactNode;
+  /** Row (by rowKey) the user just wrote — settles in with the 2s highlight
+   * (AMANAH motion verb "settle", sprint §11). */
+  highlightKey?: string | null;
   /** Optional line under the table (as-of caption etc.). */
   footnote?: React.ReactNode;
   className?: string;
@@ -119,6 +128,7 @@ export function FinTable<T>({
   rowAriaLabel,
   toolbar,
   mobileCard,
+  highlightKey,
   footnote,
   className,
 }: FinTableProps<T>) {
@@ -264,7 +274,10 @@ export function FinTable<T>({
                       className={cn(
                         "border-b transition-colors",
                         onRowClick &&
-                          "cursor-pointer outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/50"
+                          "cursor-pointer outline-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/50",
+                        highlightKey != null &&
+                          rowKey(row) === highlightKey &&
+                          "animate-settle"
                       )}
                     >
                       {visibleColumns.map((col) => (
@@ -319,7 +332,9 @@ export function FinTable<T>({
                     {groupLabel}
                   </p>
                 )}
-                {mobileCard(row)}
+                {mobileCard(row, {
+                  highlight: highlightKey != null && rowKey(row) === highlightKey,
+                })}
               </React.Fragment>
             );
           })}
