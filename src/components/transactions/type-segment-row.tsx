@@ -128,8 +128,12 @@ export function TypeSegmentRow({
         }
 
         return (
+          // `modal`: the dialog underneath is a modal layer (body pointer-events
+          // disabled) — a non-modal portaled popover never receives mouse clicks
+          // there (D3 smoke-test finding; keyboard path was unaffected).
           <Popover
             key={seg.id}
+            modal
             open={openMenu === seg.id}
             onOpenChange={(o) => setOpenMenu(o ? seg.id : null)}
           >

@@ -40,10 +40,16 @@ export function AssetSearch({
   selected,
   onSelect,
   onClear,
+  consumeEscapeRef,
 }: {
   selected: SelectedAsset | null;
   onSelect: (selection: SelectedAsset) => void;
   onClear: () => void;
+  /** The dialog's Escape hook (§11): Radix handles Escape at the document
+   * level BEFORE the input ever sees it, so the dialog asks the search to
+   * consume it first. Returns true when open results/query were cleared —
+   * the dialog then keeps itself open. */
+  consumeEscapeRef?: React.MutableRefObject<(() => boolean) | null>;
 }) {
   const [query, setQuery] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -84,6 +90,24 @@ export function AssetSearch({
     const t = setTimeout(() => void search(query), 300);
     return () => clearTimeout(t);
   }, [query, search]);
+
+  // Escape-consumption contract with the dialog (no deps: the callback must
+  // always close over the CURRENT phase/query/selected).
+  useEffect(() => {
+    if (!consumeEscapeRef) return;
+    consumeEscapeRef.current = () => {
+      if (selected) return false; // chip shown — nothing to dismiss
+      if (phase.kind === "results" || phase.kind === "loading" || query) {
+        setQuery("");
+        setPhase({ kind: "idle" });
+        return true;
+      }
+      return false;
+    };
+    return () => {
+      consumeEscapeRef.current = null;
+    };
+  });
 
   async function ensure(result: SymbolSearchResult, confirmWarned: boolean) {
     setPhase({ kind: "ensuring" });

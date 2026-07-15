@@ -1,6 +1,6 @@
 # CURRENT_STATE
 
-_Last updated: 2026-07-15 (D3 implemented — local commit, NOT pushed; awaiting owner review)_
+_Last updated: 2026-07-15 (D3 LIVE `26829df` + authenticated smoke test done; two smoke fixes committed locally, NOT pushed)_
 
 ## Production
 
@@ -49,4 +49,4 @@ _Last updated: 2026-07-15 (D3 implemented — local commit, NOT pushed; awaiting
 
 ## Next objective
 
-D3 is implemented and committed locally — **not pushed**. Next: owner review → push (auto-deploys) → owner's authenticated production pass on the transaction flow (segmented row, ticket line, save-settle, `N` / ⌘Enter, search alignment; regression: draft-guard, sell preview, ADIB warning). Then **D4** per sprint §28.
+**D3 pushed and LIVE (`26829df`, Vercel READY 2026-07-15). Authenticated production smoke test run (agent-driven, real session): PASSED** — N-entry, segmented row, Buy save via Ctrl+Enter, TicketLine (sell P&L ≡ engine: +62.50 on 100 EMAAR @ 12.50 vs 11.875 avg), toast = ticket sentence (DOM-verified), save-settle highlight on the written Activity row (DOM-verified `animate-settle`), Dividend form, ADIB/ADX guard, draft guard, search-row alignment. Test artifacts fully deleted; ledger restored to pre-test figures. **Two defects found and FIXED (local commit, NOT pushed; awaiting owner approval):** (1) Cash ▾/Obligation ▾ menu items ignored MOUSE clicks — non-modal portaled Popover under the modal dialog loses pointer events (keyboard path was fine) → `modal` on the Popover; (2) Escape hit the close guard before clearing open search results — Radix intercepts Escape at document level before the input handler → dialog `onEscapeKeyDown` now asks AssetSearch to consume it first (`consumeEscapeRef`). 143 tests / typecheck / lint / build ✔. Next: owner approves → push fixes → re-verify the two paths → **D4** per sprint §28.

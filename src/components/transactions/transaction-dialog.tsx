@@ -116,6 +116,11 @@ export function TransactionDialog({
   const armSnapshotRef = useRef(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
+  // Escape order (§11): open search results dismiss FIRST; only a second
+  // Escape reaches the close guard. Radix intercepts Escape at the document
+  // level, so this must hook onEscapeKeyDown — an input handler is too late.
+  const searchEscapeRef = useRef<(() => boolean) | null>(null);
+
   // Load context + apply edit target when the dialog opens.
   useEffect(() => {
     if (!open) return;
@@ -444,7 +449,12 @@ export function TransactionDialog({
       }}
     >
       {/* §11: desktop dialog 560px; mobile full sheet (bottom-anchored). */}
-      <DialogContent className="max-w-[560px] max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-b-none">
+      <DialogContent
+        className="max-w-[560px] max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-y-0 max-sm:rounded-b-none"
+        onEscapeKeyDown={(e) => {
+          if (searchEscapeRef.current?.()) e.preventDefault();
+        }}
+      >
         {confirmDiscard && (
           <div
             role="alertdialog"
@@ -531,6 +541,7 @@ export function TransactionDialog({
                   <Label>Asset *</Label>
                   <AssetSearch
                     selected={selectedAsset}
+                    consumeEscapeRef={searchEscapeRef}
                     onSelect={(sel) => {
                       setSelectedAsset(sel);
                       if (sel.quotePrice != null && price === "") {
