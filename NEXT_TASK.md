@@ -1,9 +1,12 @@
 # NEXT_TASK — D4: Dashboard ("the 60-second review")
 
-> **STATUS: D4 IMPLEMENTED — local commit, NOT pushed.
-> Awaiting owner review → push → owner's authenticated production pass.**
-> After D4 is verified live, the next task is **D5 — Islamic finance center**
-> per sprint §28.
+> **STATUS: D4 COMPLETE — live in production (`beb195d`, Vercel READY),
+> authenticated production smoke test PASSED 2026-07-15/16 (full owner
+> checklist; no defects; one 1-cent ≈-aggregation observation logged in
+> CURRENT_STATE). All test state restored (hawl date null, currency AED,
+> snoozes/period cleared).**
+> The next task is **D5 — Islamic finance center** per sprint §28 — not
+> started; awaiting owner go-ahead.
 
 ## Delivered scope (D4 — sprint §28/§9, fuses milestone Phase 6 dashboard)
 
