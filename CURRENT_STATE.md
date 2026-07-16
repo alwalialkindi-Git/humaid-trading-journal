@@ -37,6 +37,12 @@ _Last updated: 2026-07-16 (D4 COMPLETE — live `beb195d`, Vercel READY, authent
 
 **D1b delivery notes (superseded heading):** Delivered: grouped nav shell (Council IA — OVERVIEW/WEALTH/THINKING/PURITY◆/UNDERSTAND; labels Wealth·Journal·Screener·Insights·Zakat & Purify, routes unchanged; shared `nav-config.ts` single source), ⌘K command palette (hand-rolled on Dialog, ARIA combobox, Actions + Navigate, opens the same TransactionDialog), mobile bottom tab bar (Home·Wealth·+·Zakat·More sheet; FAB retired; safe-area; toaster raised above bar), compliance ShieldBadge system (filled/half/slashed/dashed-outline shapes + labels — never color-alone; swapped into ComplianceBadge + Positions), glossary registry (`lib/glossary.ts`, 15 terms) + GlossaryTerm popover (wired: sell avg-cost, dividend purification). THINKING houses Journal+Calendar until Research lands (M5.5). Next: owner review of D1b → push → **D2 Wealth redesign**.
 
+## Parking Lot
+
+Deferred by owner decision — do not implement until explicitly scheduled:
+
+- **Unify FX aggregation rounding order across summary and exposure views.** (D4 smoke test, 2026-07-16: exposure-band ≈ total 98,406.68 AED vs Market value card 98,406.69 AED — per-row round2-then-sum vs convert-currency-totals; both ≈-marked, same normalized base; 1-cent display divergence only.)
+
 ## Known limitations
 
 - **Two worlds until Phase 8 migration:** Dashboard, Trades, Analytics, Calendar, Watchlist, Shariah, and the Zakat prefill still read **legacy MVP tables**; only Portfolio is ledger-true. Legacy-data notice shown on Dashboard.
